@@ -172,8 +172,11 @@ struct CLIBackend: AdsBackend {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private var currencyOffset: Double {
-        // Marketing API budgets are in minor units; these currencies have none.
-        ["JPY", "KRW", "TWD", "VND"].contains(Fmt.currency) ? 1 : 100
+        // Marketing API budgets are in minor units, except these currencies
+        // (Meta's documented offset-1 list — verified live for IDR: a raw
+        // daily_budget of 150000 is Rp 150,000 in Ads Manager, not Rp 1,500).
+        ["CLP", "COP", "CRC", "HUF", "IDR", "ISK", "JPY", "KRW",
+         "MWK", "PYG", "TWD", "UGX", "VND", "XAF", "XOF"].contains(Fmt.currency) ? 1 : 100
     }
 
     private func status(_ row: [String: Any]) -> EntityStatus {
