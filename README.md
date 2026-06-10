@@ -83,3 +83,7 @@ All write commands the app can issue live in [`Sources/Backend/CLIBackend.swift`
 ## Design
 
 Implemented from a Claude Design handoff bundle ("Pacer — Meta Ads for Mac") on the Mayar design system: Plus Jakarta Sans (bundled), brand blue `#2D3DEC` / magenta `#E91E78`, ported to SwiftUI with full light/dark token sets. Charts are hand-rolled SwiftUI `Path`s — no dependencies. Built with [Claude Code](https://claude.com/claude-code).
+
+## License
+
+[MIT](LICENSE) — the bundled Plus Jakarta Sans font is licensed separately under the [SIL Open Font License](https://fonts.google.com/specimen/Plus+Jakarta+Sans/license).
