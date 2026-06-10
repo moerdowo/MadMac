@@ -5,7 +5,7 @@
 <h1 align="center">MadMac</h1>
 
 <p align="center"><b>Manage your Meta ads natively on macOS.</b><br>
-A SwiftUI app on top of Meta's official ads-cli — campaigns, insights, and a review-before-launch flow that makes sure nothing spends money without your explicit approval.</p>
+A SwiftUI app for your Meta ad account — campaigns, insights, and a review-before-launch flow that makes sure nothing spends money without your explicit approval.</p>
 
 ---
 
@@ -13,13 +13,13 @@ A SwiftUI app on top of Meta's official ads-cli — campaigns, insights, and a r
 
 ## Why
 
-Meta's Ads Manager is a heavy web app. Meta's [Ads CLI](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview) (`meta-ads` on PyPI) is a terminal tool. MadMac is the missing middle: a real Mac app — sidebar, charts, switches, dark mode — that uses the CLI as invisible plumbing against the Marketing API.
+Meta's Ads Manager is a heavy web app. MadMac is a real Mac app — sidebar, charts, switches, dark mode — talking to your ad account through the Meta Marketing API.
 
 ## The hero flow: review before launch
 
 Nothing touches your ad account until you approve it.
 
-Flipping any status switch or finishing the create wizard **stages** the change. A floating bar shows what's staged; *Review & launch* opens the launch plan — a spec tree for new campaigns and before→after diffs for status changes — gated behind **Approve & launch**. New campaigns are created `PAUSED` (mirroring the ads-cli default) unless you explicitly toggle *Launch active now*.
+Flipping any status switch or finishing the create wizard **stages** the change. A floating bar shows what's staged; *Review & launch* opens the launch plan — a spec tree for new campaigns and before→after diffs for status changes — gated behind **Approve & launch**. New campaigns are always created `PAUSED` unless you explicitly toggle *Launch active now*.
 
 ![Review sheet](docs/05-review-sheet.png)
 
@@ -49,7 +49,7 @@ MadMac opens with the onboarding guide. In short:
 4. Your ad account ID is the `act=…` number in the [Ads Manager](https://adsmanager.facebook.com) URL.
 5. Paste both into MadMac.
 
-The token is stored in the **macOS Keychain** and handed to the CLI via environment variables only — it never touches disk in plain text. The first connection creates a private Python venv in `~/Library/Application Support/MadMac/` and installs `meta-ads` (needs Python 3.12 or 3.13, e.g. `brew install python@3.13`).
+The token is stored in the **macOS Keychain** — it never touches disk in plain text. The first connection sets up a private helper environment in `~/Library/Application Support/MadMac/` (needs Python 3.12 or 3.13, e.g. `brew install python@3.13`).
 
 Prefer to look around first? *Explore sample data* loads a fictional account with realistic numbers.
 
@@ -67,7 +67,7 @@ Requires macOS 14+ and Xcode 16+.
 
 ```sh
 MadMac --snapshot /tmp/shots          # render every screen to PNG (ImageRenderer)
-MadMac --connect <token> <account_id> # store credentials from the CLI
+MadMac --connect <token> <account_id> # store credentials from the terminal
 MadMac --live-check                   # exercise the live pipeline headlessly
 ```
 
@@ -76,9 +76,9 @@ MadMac --live-check                   # exercise the live pipeline headlessly
 `AdsBackend` protocol with two implementations:
 
 - **SampleBackend** — the bundled demo dataset.
-- **CLIBackend** — shells out to `meta --no-input -o json ads …`, with lenient JSON parsing (the CLI prints human-readable lines around its JSON), per-campaign insight queries capped to respect the ~200 calls/hour rate limit, and currency-offset handling verified against a real account (IDR and 14 other currencies have no minor units in the Marketing API, despite the CLI's "in cents" wording).
+- A **live backend** against the Marketing API, with per-campaign insight queries capped to respect the ~200 calls/hour rate limit and currency-offset handling verified against a real account (IDR and 14 other currencies have no minor units in the Marketing API).
 
-All write commands the app can issue live in [`Sources/Backend/CLIBackend.swift`](Sources/Backend/CLIBackend.swift): `campaign|adset|ad update --status`, and `campaign create` (always `PAUSED` unless approved live).
+Every write the app can issue lives in [`Sources/Backend/CLIBackend.swift`](Sources/Backend/CLIBackend.swift): campaign/ad set/ad status updates, and campaign creation (always `PAUSED` unless approved live).
 
 ## Design
 
