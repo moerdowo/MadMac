@@ -1,34 +1,57 @@
-# MadMac — Meta Ads for Mac
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="MadMac icon">
+</p>
 
-A native macOS app for managing Meta (Facebook/Instagram) ad campaigns, built with SwiftUI on the Mayar design system. MadMac is a GUI on top of Meta's official [Ads CLI](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview) (`meta-ads` on PyPI) — the CLI is invisible plumbing; you get panels, charts, and switches.
+<h1 align="center">MadMac</h1>
+
+<p align="center"><b>Manage your Meta ads natively on macOS.</b><br>
+A SwiftUI app on top of Meta's official ads-cli — campaigns, insights, and a review-before-launch flow that makes sure nothing spends money without your explicit approval.</p>
+
+---
 
 ![Performance dashboard](docs/01-performance-overview.png)
 
+## Why
+
+Meta's Ads Manager is a heavy web app. Meta's [Ads CLI](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview) (`meta-ads` on PyPI) is a terminal tool. MadMac is the missing middle: a real Mac app — sidebar, charts, switches, dark mode — that uses the CLI as invisible plumbing against the Marketing API.
+
 ## The hero flow: review before launch
 
-Nothing touches your ad account until you approve it. Flipping any status switch or finishing the create wizard *stages* the change. A floating bar shows what's staged; **Review & launch** opens a launch plan — a spec tree for new campaigns and before→after diffs for status changes — gated behind **Approve & launch**. New campaigns are created `PAUSED` by default (mirroring the ads-cli) unless you toggle *Launch active now*.
+Nothing touches your ad account until you approve it.
+
+Flipping any status switch or finishing the create wizard **stages** the change. A floating bar shows what's staged; *Review & launch* opens the launch plan — a spec tree for new campaigns and before→after diffs for status changes — gated behind **Approve & launch**. New campaigns are created `PAUSED` (mirroring the ads-cli default) unless you explicitly toggle *Launch active now*.
 
 ![Review sheet](docs/05-review-sheet.png)
 
-## Sections
+## Features
 
-- **Performance** — KPI cards with 7-day deltas and sparklines, revenue/spend chart, placement donut, top campaigns, diagnostics feed. Three layouts (Overview / Spotlight / Table) switchable in Settings.
-- **Campaigns** — expandable campaign → ad set → ad tree with per-row metrics, learning-phase badges, search and status filters, a detail drawer, and a 3-step create wizard.
-- **Catalog** — product stats and top products by ad ROAS.
-- **Diagnostics** — account health score and delivery signals.
-- **Datasets** — pixel events, match quality.
+- **Performance dashboard** — KPI cards with 7-day deltas and sparklines (spend, revenue, ROAS, purchases, CPA, CTR, reach, CPM), a revenue/spend chart, top campaigns, and a diagnostics feed. Three switchable layouts: Overview, Spotlight, Table.
+- **Campaigns** — an expandable campaign → ad set → ad tree with per-row metrics, learning-phase badges, search and status filters, a detail drawer, and a 3-step create wizard.
 
-Light/dark mode, four accent colors, and density options in Settings (⌘,).
+  ![Campaigns](docs/04-campaigns.png)
 
-## Connecting a real account
+- **Catalog, Diagnostics, Datasets** — product performance, account-health signals, and pixel events.
+- **Onboarding that actually onboards** — a step-by-step guide to creating a Meta app, a System User, and a properly-scoped access token, with deep links into the right Meta dashboards.
 
-MadMac opens with a connect prompt (sample data — a fictional Indonesian DTC account — is available as an explicit choice). To connect a real account:
+  ![Onboarding](docs/00-onboarding.png)
 
-1. Create a System User in Business Manager (or use Graph API Explorer) and generate an access token with `ads_management`, `read_insights`, `business_management`.
-2. In MadMac: account card (bottom-left) → **Connect Meta account…**, paste the token + ad account ID.
-3. The first connection creates a private Python venv in `~/Library/Application Support/MadMac/` and installs the `meta-ads` CLI (needs Python 3.12+, e.g. `brew install python`).
+- **Mayar design system** — Plus Jakarta Sans, brand blue/magenta, full light & dark token sets, four accent colors, and density settings (⌘,).
 
-Credentials are stored in the macOS Keychain and passed to the CLI via environment variables only.
+  ![Dark mode](docs/11-dark-overview.png)
+
+## Connecting your account
+
+MadMac opens with the onboarding guide. In short:
+
+1. Create a Meta app ([developers.facebook.com/apps](https://developers.facebook.com/apps)) with the *Marketing API* use case.
+2. In [Business Settings](https://business.facebook.com/settings), create a **System User** (Admin) and assign it your **ad account** and the **app**.
+3. Generate a token with `ads_management`, `ads_read`, `read_insights`, `business_management`.
+4. Your ad account ID is the `act=…` number in the [Ads Manager](https://adsmanager.facebook.com) URL.
+5. Paste both into MadMac.
+
+The token is stored in the **macOS Keychain** and handed to the CLI via environment variables only — it never touches disk in plain text. The first connection creates a private Python venv in `~/Library/Application Support/MadMac/` and installs `meta-ads` (needs Python 3.12 or 3.13, e.g. `brew install python@3.13`).
+
+Prefer to look around first? *Explore sample data* loads a fictional account with realistic numbers.
 
 ## Building
 
@@ -38,8 +61,25 @@ xcodegen generate
 xcodebuild -project MadMac.xcodeproj -scheme MadMac -configuration Release build
 ```
 
-Debug helper: `MadMac --snapshot /tmp/shots` renders every key screen to PNG.
+Requires macOS 14+ and Xcode 16+.
+
+### Debug helpers
+
+```sh
+MadMac --snapshot /tmp/shots          # render every screen to PNG (ImageRenderer)
+MadMac --connect <token> <account_id> # store credentials from the CLI
+MadMac --live-check                   # exercise the live pipeline headlessly
+```
+
+## How it talks to Meta
+
+`AdsBackend` protocol with two implementations:
+
+- **SampleBackend** — the bundled demo dataset.
+- **CLIBackend** — shells out to `meta --no-input -o json ads …`, with lenient JSON parsing (the CLI prints human-readable lines around its JSON), per-campaign insight queries capped to respect the ~200 calls/hour rate limit, and currency-offset handling verified against a real account (IDR and 14 other currencies have no minor units in the Marketing API, despite the CLI's "in cents" wording).
+
+All write commands the app can issue live in [`Sources/Backend/CLIBackend.swift`](Sources/Backend/CLIBackend.swift): `campaign|adset|ad update --status`, and `campaign create` (always `PAUSED` unless approved live).
 
 ## Design
 
-Implemented from a Claude Design handoff bundle (“Pacer — Meta Ads for Mac”): Mayar design tokens (Plus Jakarta Sans, brand blue `#2D3DEC` / magenta `#E91E78`), ported to SwiftUI with full light/dark token sets.
+Implemented from a Claude Design handoff bundle ("Pacer — Meta Ads for Mac") on the Mayar design system: Plus Jakarta Sans (bundled), brand blue `#2D3DEC` / magenta `#E91E78`, ported to SwiftUI with full light/dark token sets. Charts are hand-rolled SwiftUI `Path`s — no dependencies. Built with [Claude Code](https://claude.com/claude-code).
