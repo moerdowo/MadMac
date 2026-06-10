@@ -116,9 +116,10 @@ private struct AccountCard: View {
         } label: {
             cardLabel
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
-        .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .frame(maxWidth: .infinity)
     }
 
     private var cardLabel: some View {
