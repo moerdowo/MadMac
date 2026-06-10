@@ -271,6 +271,21 @@ private struct PlacementDonutCard: View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Spend by placement").font(jakarta(15, .bold)).foregroundStyle(th.fg1)
+                // The placement split is part of the sample dataset only; live
+                // breakdowns need per-placement insight queries (not wired yet).
+                if state.mode == .live {
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.pie")
+                            .font(.system(size: 24))
+                            .foregroundStyle(th.fg4)
+                        Text("Placement breakdown appears once campaigns deliver.")
+                            .font(jakarta(12.5))
+                            .foregroundStyle(th.fg3)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                } else {
                 HStack(spacing: 18) {
                     ZStack {
                         DonutChart(segments: segments)
@@ -292,6 +307,7 @@ private struct PlacementDonutCard: View {
                             }
                         }
                     }
+                }
                 }
             }
         }

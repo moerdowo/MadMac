@@ -19,7 +19,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
-enum BackendMode: String { case sample, live }
+enum BackendMode: String { case disconnected, sample, live }
 
 @MainActor
 final class AppState: ObservableObject {
@@ -38,7 +38,7 @@ final class AppState: ObservableObject {
     @Published var connectOpen = false
 
     // backend
-    @Published var mode: BackendMode = .sample
+    @Published var mode: BackendMode = .disconnected
     @Published var isLoading = false
     @Published var isApplying = false
     @Published var banner: Banner?
@@ -50,14 +50,18 @@ final class AppState: ObservableObject {
         var isError: Bool
     }
 
+    // Start blank: live data if an account is connected, otherwise the connect
+    // prompt. Sample data only appears when explicitly chosen.
     init() {
-        let snap = SampleData.snapshot
+        let snap = EmptyData.snapshot
         snapshot = snap
-        campaigns = snap.campaigns
+        campaigns = []
         backend = SampleBackend()
         Fmt.currency = snap.account.currency
         if Credentials.load() != nil {
             switchToLive()
+        } else {
+            connectOpen = true
         }
     }
 

@@ -21,6 +21,7 @@ enum SnapshotRunner {
         func shot(_ name: String, dark: Bool = false, configure: (AppState) -> Void) {
             let state = AppState()
             state.switchToSample()
+            state.connectOpen = false
             configure(state)
             let view = RootView()
                 .environmentObject(state)

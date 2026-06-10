@@ -22,7 +22,7 @@ final class Sidecar: @unchecked Sendable {
     static let shared = Sidecar()
 
     private let supportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Pacer", isDirectory: true)
+        .appendingPathComponent("MadMac", isDirectory: true)
     private var venvDir: URL { supportDir.appendingPathComponent("venv", isDirectory: true) }
     private var metaBin: URL { venvDir.appendingPathComponent("bin/meta") }
 

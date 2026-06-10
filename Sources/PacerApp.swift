@@ -87,6 +87,14 @@ struct RootView: View {
     }
 
     @ViewBuilder private var sectionView: some View {
+        if state.mode == .disconnected {
+            DisconnectedView()
+        } else {
+            sectionContent
+        }
+    }
+
+    @ViewBuilder private var sectionContent: some View {
         let content = Group {
             switch state.section {
             case .performance: PerformanceView()
@@ -105,6 +113,49 @@ struct RootView: View {
         } else {
             ScrollView { content }.id(state.section)
         }
+    }
+}
+
+// Blank-slate prompt shown until an account is connected.
+struct DisconnectedView: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.theme) private var th
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(th.accent)
+                    .frame(width: 56, height: 56)
+                    .overlay(Image(systemName: "bolt.fill")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(.white))
+                Circle()
+                    .fill(th.brandMagenta)
+                    .frame(width: 16, height: 16)
+                    .overlay(Circle().stroke(th.bg2, lineWidth: 2.5))
+                    .offset(x: 5, y: -5)
+            }
+            VStack(spacing: 6) {
+                Text("Connect your Meta account")
+                    .font(jakarta(20, .extra)).kerning(-0.2)
+                    .foregroundStyle(th.fg1)
+                Text("MadMac manages campaigns through Meta's ads-cli.\nNothing goes live without your approval.")
+                    .font(jakarta(13))
+                    .foregroundStyle(th.fg3)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            }
+            HStack(spacing: 10) {
+                Btn(variant: .primary, icon: "link", label: "Connect Meta account…") {
+                    state.connectOpen = true
+                }
+                Btn(variant: .secondary, label: "Explore sample data") {
+                    state.switchToSample()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

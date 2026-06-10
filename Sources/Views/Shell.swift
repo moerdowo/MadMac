@@ -26,7 +26,7 @@ struct SidebarView: View {
                         .overlay(Circle().stroke(th.sidebar, lineWidth: 1.5))
                         .offset(x: 3, y: -3)
                 }
-                Text("Pacer")
+                Text("MadMac")
                     .font(jakarta(16, .extra))
                     .kerning(-0.3)
                     .foregroundStyle(th.fg1)
@@ -107,6 +107,9 @@ private struct AccountCard: View {
                 if Credentials.load() != nil {
                     Button("Use connected account") { state.switchToLive() }
                 }
+                if state.mode == .disconnected {
+                    Button("Explore sample data") { state.switchToSample() }
+                }
             }
             Divider()
             Button("Disconnect account", role: .destructive) {
@@ -135,7 +138,8 @@ private struct AccountCard: View {
                         .font(jakarta(12.5, .bold))
                         .foregroundStyle(th.fg1)
                         .lineLimit(1)
-                    Text(state.mode == .sample ? "Sample data" : state.snapshot.account.accountId)
+                    Text(state.mode == .disconnected ? "Not connected"
+                         : state.mode == .sample ? "Sample data" : state.snapshot.account.accountId)
                         .font(jakarta(10.5))
                         .foregroundStyle(th.fg4)
                         .lineLimit(1)
@@ -170,23 +174,25 @@ struct ToolbarView: View {
                 ProgressView().controlSize(.small)
             }
             Spacer()
-            HStack(spacing: 8) {
-                Image(systemName: "wallet.pass")
-                    .font(.system(size: 13))
-                Text("Today ")
-                + Text(Fmt.money(account.daySpend, compact: true)).bold().foregroundStyle(th.fg1)
-                + Text(" / \(Fmt.money(account.budget, compact: true))")
-                Capsule().fill(th.bg3)
-                    .frame(width: 54, height: 6)
-                    .overlay(alignment: .leading) {
-                        Capsule().fill(th.accent).frame(width: 54 * pct)
-                    }
-            }
-            .font(jakarta(12.5))
-            .foregroundStyle(th.fg3)
-            .lineLimit(1)
+            if state.mode != .disconnected {
+                HStack(spacing: 8) {
+                    Image(systemName: "wallet.pass")
+                        .font(.system(size: 13))
+                    Text("Today ")
+                    + Text(Fmt.money(account.daySpend, compact: true)).bold().foregroundStyle(th.fg1)
+                    + Text(" / \(Fmt.money(account.budget, compact: true))")
+                    Capsule().fill(th.bg3)
+                        .frame(width: 54, height: 6)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(th.accent).frame(width: 54 * pct)
+                        }
+                }
+                .font(jakarta(12.5))
+                .foregroundStyle(th.fg3)
+                .lineLimit(1)
 
-            Rectangle().fill(th.border).frame(width: 1, height: 22)
+                Rectangle().fill(th.border).frame(width: 1, height: 22)
+            }
             IconButton(icon: "bell") {}
         }
         .padding(.horizontal, 24)

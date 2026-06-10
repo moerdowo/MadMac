@@ -8,7 +8,7 @@ struct Credentials {
 
     var actId: String { accountId.hasPrefix("act_") ? accountId : "act_\(accountId)" }
 
-    private static let service = "com.moerdowo.Pacer"
+    private static let service = "com.moerdowo.MadMac"
     private static let account = "meta-ads"
 
     static func load() -> Credentials? {

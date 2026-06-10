@@ -1,4 +1,4 @@
-name: Pacer
+name: MadMac
 options:
   bundleIdPrefix: com.moerdowo
   deploymentTarget:
@@ -13,7 +13,7 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_IDENTITY: "-"
 targets:
-  Pacer:
+  MadMac:
     type: application
     platform: macOS
     sources:
@@ -28,10 +28,10 @@ targets:
         optional: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.moerdowo.Pacer
-        PRODUCT_NAME: Pacer
+        PRODUCT_BUNDLE_IDENTIFIER: com.moerdowo.MadMac
+        PRODUCT_NAME: MadMac
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 moerdowo"
-        INFOPLIST_KEY_CFBundleDisplayName: Pacer
+        INFOPLIST_KEY_CFBundleDisplayName: MadMac
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.business"
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_USER_SCRIPT_SANDBOXING: NO

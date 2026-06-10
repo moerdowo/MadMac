@@ -1,6 +1,6 @@
-# Pacer — Meta Ads for Mac
+# MadMac — Meta Ads for Mac
 
-A native macOS app for managing Meta (Facebook/Instagram) ad campaigns, built with SwiftUI on the Mayar design system. Pacer is a GUI on top of Meta's official [Ads CLI](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview) (`meta-ads` on PyPI) — the CLI is invisible plumbing; you get panels, charts, and switches.
+A native macOS app for managing Meta (Facebook/Instagram) ad campaigns, built with SwiftUI on the Mayar design system. MadMac is a GUI on top of Meta's official [Ads CLI](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-cli/ads-cli-overview) (`meta-ads` on PyPI) — the CLI is invisible plumbing; you get panels, charts, and switches.
 
 ![Performance dashboard](docs/01-performance-overview.png)
 
@@ -22,11 +22,11 @@ Light/dark mode, four accent colors, and density options in Settings (⌘,).
 
 ## Connecting a real account
 
-Pacer starts in **sample mode** (a fictional Indonesian DTC account). To connect a real account:
+MadMac opens with a connect prompt (sample data — a fictional Indonesian DTC account — is available as an explicit choice). To connect a real account:
 
 1. Create a System User in Business Manager (or use Graph API Explorer) and generate an access token with `ads_management`, `read_insights`, `business_management`.
-2. In Pacer: account card (bottom-left) → **Connect Meta account…**, paste the token + ad account ID.
-3. The first connection creates a private Python venv in `~/Library/Application Support/Pacer/` and installs the `meta-ads` CLI (needs Python 3.12+, e.g. `brew install python`).
+2. In MadMac: account card (bottom-left) → **Connect Meta account…**, paste the token + ad account ID.
+3. The first connection creates a private Python venv in `~/Library/Application Support/MadMac/` and installs the `meta-ads` CLI (needs Python 3.12+, e.g. `brew install python`).
 
 Credentials are stored in the macOS Keychain and passed to the CLI via environment variables only.
 
@@ -35,10 +35,10 @@ Credentials are stored in the macOS Keychain and passed to the CLI via environme
 ```sh
 brew install xcodegen
 xcodegen generate
-xcodebuild -project Pacer.xcodeproj -scheme Pacer -configuration Release build
+xcodebuild -project MadMac.xcodeproj -scheme MadMac -configuration Release build
 ```
 
-Debug helper: `Pacer --snapshot /tmp/shots` renders every key screen to PNG.
+Debug helper: `MadMac --snapshot /tmp/shots` renders every key screen to PNG.
 
 ## Design
 

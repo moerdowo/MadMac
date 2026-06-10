@@ -140,3 +140,21 @@ enum SampleData {
                         products: products, events: events)
     }
 }
+
+// Blank state shown before an account is connected (or while live data loads).
+enum EmptyData {
+    static var snapshot: AccountSnapshot {
+        func zero(_ fmt: KpiFormat, invert: Bool = false) -> Kpi {
+            Kpi(value: 0, delta: 0, series: [0, 0], fmt: fmt, invert: invert)
+        }
+        return AccountSnapshot(
+            account: AdsAccount(brand: "Pacer", name: "Not connected", accountId: "—",
+                                currency: "USD", region: "", daySpend: 0, budget: 0),
+            kpis: KpiSet(spend: zero(.money), revenue: zero(.money), roas: zero(.x),
+                         purchases: zero(.int), cpa: zero(.money, invert: true), ctr: zero(.pct),
+                         reach: zero(.int), cpm: zero(.money, invert: true)),
+            campaigns: [], diagnostics: [],
+            seriesSpend: [0, 0], seriesRevenue: [0, 0], seriesRoas: [0, 0],
+            products: [], events: [])
+    }
+}
