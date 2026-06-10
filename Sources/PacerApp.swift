@@ -82,6 +82,7 @@ struct RootView: View {
             .padding(.top, 12)
         }
         .environment(\.theme, theme)
+        .focusEffectDisabled()   // no focus rings anywhere in the window
         .animation(.easeOut(duration: 0.18), value: state.pendingCount > 0)
         .animation(.easeOut(duration: 0.18), value: state.banner?.id)
     }
