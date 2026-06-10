@@ -148,7 +148,7 @@ enum EmptyData {
             Kpi(value: 0, delta: 0, series: [0, 0], fmt: fmt, invert: invert)
         }
         return AccountSnapshot(
-            account: AdsAccount(brand: "Pacer", name: "Not connected", accountId: "—",
+            account: AdsAccount(brand: "MadMac", name: "MadMac", accountId: "—",
                                 currency: "USD", region: "", daySpend: 0, budget: 0),
             kpis: KpiSet(spend: zero(.money), revenue: zero(.money), roas: zero(.x),
                          purchases: zero(.int), cpa: zero(.money, invert: true), ctr: zero(.pct),

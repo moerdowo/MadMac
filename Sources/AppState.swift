@@ -60,9 +60,8 @@ final class AppState: ObservableObject {
         Fmt.currency = snap.account.currency
         if Credentials.load() != nil {
             switchToLive()
-        } else {
-            connectOpen = true
         }
+        // else: stay disconnected — RootView shows the onboarding screen.
     }
 
     var pendingCount: Int { pendingChanges().count + (draft != nil ? 1 : 0) }

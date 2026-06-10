@@ -37,6 +37,11 @@ enum SnapshotRunner {
             }
         }
 
+        shot("00-onboarding") { state in
+            state.snapshot = EmptyData.snapshot
+            state.campaigns = []
+            state.mode = .disconnected
+        }
         prefs.dashLayout = .overview
         shot("01-performance-overview") { $0.section = .performance }
         prefs.dashLayout = .spotlight

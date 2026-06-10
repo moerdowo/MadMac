@@ -28,6 +28,7 @@
 		C1AB62E918437D95A796691C /* CreateWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8021CFBC2E984A0B744C31FD /* CreateWizard.swift */; };
 		C3797B3F4252945A7BC36D16 /* CLIBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FCB75B5A2C105DB04CB02AE /* CLIBackend.swift */; };
 		C4B68585FF7BB14FC300CE76 /* PlusJakartaSans-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 67F4C785158B6776597C2FDA /* PlusJakartaSans-Italic.ttf */; };
+		CCDB25136D1115F984DF9BE2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9EBF24C94B97DCD4B26CD9 /* OnboardingView.swift */; };
 		D51E631650C308981210B8C9 /* PacerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8A79997022BB8F8FA466FD /* PacerApp.swift */; };
 		DBB97377A53729A4E8DA9C71 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398C22BB7D46FCA390705F93 /* Models.swift */; };
 		DD58A20417F5060BAE22B8C3 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 640078FA8C415D6FA051C7F5 /* AppIcon.icns */; };
@@ -43,6 +44,7 @@
 		398C22BB7D46FCA390705F93 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		43C80C0C75CA7A7C35240BB4 /* Sidecar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidecar.swift; sourceTree = "<group>"; };
 		4D4C1F6F39E3052439610DF1 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
+		4F9EBF24C94B97DCD4B26CD9 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		62557BDD2E528C0CED8C7755 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		640078FA8C415D6FA051C7F5 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		67F4C785158B6776597C2FDA /* PlusJakartaSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans-Italic.ttf"; sourceTree = "<group>"; };
@@ -144,6 +146,7 @@
 				4D4C1F6F39E3052439610DF1 /* ConnectSheet.swift */,
 				8021CFBC2E984A0B744C31FD /* CreateWizard.swift */,
 				236339462AC8E3D371AC4653 /* MoreViews.swift */,
+				4F9EBF24C94B97DCD4B26CD9 /* OnboardingView.swift */,
 				6F234915DB6E6098723D00AB /* PerformanceView.swift */,
 				96728666B29E8EA570AE9210 /* ReviewSheet.swift */,
 				28AB95B9812707763F4F0706 /* SettingsView.swift */,
@@ -234,6 +237,7 @@
 				5D9CBB57089814EF6CB938B8 /* Format.swift in Sources */,
 				DBB97377A53729A4E8DA9C71 /* Models.swift in Sources */,
 				2C996A0671328186AEC68832 /* MoreViews.swift in Sources */,
+				CCDB25136D1115F984DF9BE2 /* OnboardingView.swift in Sources */,
 				D51E631650C308981210B8C9 /* PacerApp.swift in Sources */,
 				773D835CD358FDA35C1577A1 /* PerformanceView.swift in Sources */,
 				FE3B706D2B77F3AB0392E95D /* ReviewSheet.swift in Sources */,
