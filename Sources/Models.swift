@@ -32,13 +32,13 @@ enum Objective: String, CaseIterable, Codable, Identifiable {
         case .awareness: return "Reach the most people"
         }
     }
-    // Marketing API ODAX objective for CLI writes
+    // ads-cli objective choice (lowercase, verified against meta-ads 1.0.1)
     var apiValue: String {
         switch self {
-        case .sales: return "OUTCOME_SALES"
-        case .leads: return "OUTCOME_LEADS"
-        case .traffic: return "OUTCOME_TRAFFIC"
-        case .awareness: return "OUTCOME_AWARENESS"
+        case .sales: return "outcome_sales"
+        case .leads: return "outcome_leads"
+        case .traffic: return "outcome_traffic"
+        case .awareness: return "outcome_awareness"
         }
     }
 }

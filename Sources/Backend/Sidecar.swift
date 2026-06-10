@@ -29,12 +29,15 @@ final class Sidecar: @unchecked Sendable {
     var isInstalled: Bool { FileManager.default.isExecutableFile(atPath: metaBin.path) }
 
     private func findPython() -> String? {
+        // meta-ads 1.0.1 ships compiled wheels for CPython 3.12/3.13 only, so
+        // prefer those over a newer generic python3 (3.14 has no wheel).
         let candidates = [
+            "/opt/homebrew/bin/python3.13", "/opt/homebrew/bin/python3.12",
+            "/usr/local/bin/python3.13", "/usr/local/bin/python3.12",
             "/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3",
-            "/opt/homebrew/bin/python3.14", "/opt/homebrew/bin/python3.13", "/opt/homebrew/bin/python3.12",
         ]
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
-            if let out = try? runProcess(path, ["-c", "import sys; print(sys.version_info >= (3,12))"], env: [:]),
+            if let out = try? runProcess(path, ["-c", "import sys; print((3,12) <= sys.version_info < (3,14))"], env: [:]),
                out.trimmingCharacters(in: .whitespacesAndNewlines) == "True" {
                 return path
             }

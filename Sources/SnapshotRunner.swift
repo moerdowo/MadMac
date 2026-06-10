@@ -9,6 +9,8 @@ enum SnapshotRunner {
     static private(set) var isActive = false
 
     static func runIfRequested() {
+        connectIfRequested()
+        liveCheckIfRequested()
         guard let idx = CommandLine.arguments.firstIndex(of: "--snapshot") else { return }
         isActive = true
         let dir = CommandLine.arguments.count > idx + 1 ? CommandLine.arguments[idx + 1] : "/tmp/pacer_shots"
@@ -71,5 +73,49 @@ enum SnapshotRunner {
             state.connectOpen = true
         }
         exit(0)
+    }
+
+    // `Pacer --connect <token> <account_id> [page_id]` — store credentials in
+    // the Keychain from the app's own code signature, then exit.
+    private static func connectIfRequested() {
+        guard let idx = CommandLine.arguments.firstIndex(of: "--connect"),
+              CommandLine.arguments.count > idx + 2 else { return }
+        let args = CommandLine.arguments
+        let creds = Credentials(accessToken: args[idx + 1], accountId: args[idx + 2],
+                                pageId: args.count > idx + 3 ? args[idx + 3] : "")
+        do {
+            try creds.save()
+            print("connected: \(creds.actId)")
+            exit(0)
+        } catch {
+            print("connect failed: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+
+    // `Pacer --live-check` — load a snapshot through the CLI backend with the
+    // stored credentials and print a summary. Exercises the whole live path.
+    private static func liveCheckIfRequested() {
+        guard CommandLine.arguments.contains("--live-check") else { return }
+        guard let creds = Credentials.load() else {
+            print("live-check: no credentials in Keychain")
+            exit(1)
+        }
+        Task {
+            do {
+                let snap = try await CLIBackend(credentials: creds).loadSnapshot()
+                print("account: \(snap.account.name) (\(snap.account.accountId)) \(snap.account.currency)")
+                print("campaigns: \(snap.campaigns.count)")
+                for c in snap.campaigns.prefix(5) {
+                    print("  - [\(c.status.rawValue)] \(c.name) · \(c.objective.rawValue) · daily \(Fmt.money(c.daily, compact: true)) · \(c.adsets.count) adsets")
+                }
+                print("series points: \(snap.seriesSpend.count), diagnostics: \(snap.diagnostics.count)")
+                exit(0)
+            } catch {
+                print("live-check failed: \(error.localizedDescription)")
+                exit(1)
+            }
+        }
+        RunLoop.main.run()
     }
 }
