@@ -80,19 +80,6 @@ MadMac --connect <token> <account_id> # store credentials from the terminal
 MadMac --live-check                   # exercise the live pipeline headlessly
 ```
 
-## How it talks to Meta
-
-`AdsBackend` protocol with two implementations:
-
-- **SampleBackend** — the bundled demo dataset.
-- A **live backend** against the Marketing API, with per-campaign insight queries capped to respect the ~200 calls/hour rate limit and currency-offset handling verified against a real account (IDR and 14 other currencies have no minor units in the Marketing API).
-
-Every write the app can issue lives in [`Sources/Backend/CLIBackend.swift`](Sources/Backend/CLIBackend.swift): campaign/ad set/ad status updates, and campaign creation (always `PAUSED` unless approved live).
-
-## Design
-
-Implemented from a Claude Design handoff bundle ("Pacer — Meta Ads for Mac") on the Mayar design system: Plus Jakarta Sans (bundled), brand blue `#2D3DEC` / magenta `#E91E78`, ported to SwiftUI with full light/dark token sets. Charts are hand-rolled SwiftUI `Path`s — no dependencies. Built with [Claude Code](https://claude.com/claude-code).
-
 ## License
 
 [MIT](LICENSE) — the bundled Plus Jakarta Sans font is licensed separately under the [SIL Open Font License](https://fonts.google.com/specimen/Plus+Jakarta+Sans/license).
