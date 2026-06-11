@@ -297,7 +297,12 @@ struct CLIBackend: AdsBackend {
         do {
             creativeOut = try await run(creativeArgs)
         } catch {
-            report.warnings.append("creative failed: \(error.localizedDescription)")
+            let msg = error.localizedDescription
+            if msg.contains("development mode") {
+                report.warnings.append("Ad skipped: your Meta app is in Development Mode — switch it to Live at developers.facebook.com/apps, then create the ad again")
+            } else {
+                report.warnings.append("creative failed: \(String(msg.suffix(160)))")
+            }
             return report
         }
         guard let creativeId = createdId(creativeOut), !creativeId.isEmpty else {
@@ -421,6 +426,13 @@ struct CLIBackend: AdsBackend {
                                   target: "\(paused) campaign\(paused == 1 ? "" : "s")",
                                   detail: "Saved but not delivering. Resume them from Campaigns when ready.",
                                   icon: "pause.circle"))
+        }
+        let emptyAdsets = campaigns.flatMap(\.adsets).filter { $0.ads.isEmpty }
+        if !emptyAdsets.isEmpty {
+            out.append(Diagnostic(id: "noads", level: .warning, title: "Ad set\(emptyAdsets.count == 1 ? "" : "s") without ads",
+                                  target: emptyAdsets.map(\.name).prefix(2).joined(separator: ", "),
+                                  detail: "These can't deliver. If ad creation was skipped, your Meta app may be in Development Mode — switch it to Live at developers.facebook.com/apps, then create the ad again.",
+                                  icon: "rectangle.dashed"))
         }
         if let pixel = pixels.first(where: { !$0.lastFired.isEmpty }) {
             out.append(Diagnostic(id: "px_\(pixel.id)", level: .success, title: "Pixel receiving events",

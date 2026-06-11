@@ -138,7 +138,8 @@ final class AppState: ObservableObject {
         defer { isApplying = false }
         do {
             let report = try await backend.apply(plan)
-            applyLocally(plan: plan, createdId: report.createdCampaignId)
+            applyLocally(plan: plan, createdId: report.createdCampaignId,
+                         adCreated: report.warnings.isEmpty)
             var text = "\(plan.count) change\(plan.count == 1 ? "" : "s") applied"
             if mode == .live { text += " to \(snapshot.account.accountId)" }
             banner = Banner(text: report.warnings.isEmpty ? text
@@ -153,7 +154,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func applyLocally(plan: ChangePlan, createdId: String?) {
+    private func applyLocally(plan: ChangePlan, createdId: String?, adCreated: Bool = true) {
         campaigns = campaigns.compactMap { c in
             if pendingDeletes.contains(c.id) { return nil }
             var c = c
@@ -186,7 +187,7 @@ final class AppState: ObservableObject {
                                daily: d.daily, spend: 0, revenue: 0, roas: 0, purchases: 0, cpa: 0, ctr: 0,
                                learning: .learning, audience: d.optimization.label,
                                placements: "Advantage+ placements",
-                               ads: d.hasCreative ? [Ad(id: "ad_\(UUID().uuidString.prefix(6))", name: d.adName,
+                               ads: (d.hasCreative && adCreated) ? [Ad(id: "ad_\(UUID().uuidString.prefix(6))", name: d.adName,
                                                         status: status, spend: 0, revenue: 0, roas: 0, ctr: 0,
                                                         format: d.format, thumb: Color(hex: 0xE91E78))] : [])])
             campaigns.insert(new, at: 0)

@@ -215,7 +215,8 @@ struct BannerView: View {
         .background(Capsule().fill(th.bg1).shadow(color: .black.opacity(0.18), radius: 12, y: 4))
         .overlay(Capsule().stroke(th.border, lineWidth: 1))
         .task(id: banner.id) {
-            try? await Task.sleep(for: .seconds(5))
+            // long enough to read warnings (e.g. "ad skipped: …")
+            try? await Task.sleep(for: .seconds(banner.text.count > 60 ? 14 : 6))
             if state.banner?.id == banner.id { state.banner = nil }
         }
     }
