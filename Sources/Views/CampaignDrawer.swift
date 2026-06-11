@@ -6,6 +6,8 @@ struct CampaignDrawer: View {
     var campaign: Campaign
     @EnvironmentObject private var state: AppState
     @Environment(\.theme) private var th
+    @State private var editingBudget = false
+    @State private var budgetValue: Double = 0
 
     var body: some View {
         let eff = state.effectiveStatus(campaign.id, base: campaign.status)
@@ -89,11 +91,65 @@ struct CampaignDrawer: View {
                 }
                 .background(th.bg2)
 
-                HStack(spacing: 10) {
-                    Btn(variant: .secondary, icon: "doc.on.doc", label: "Duplicate") {}
+                VStack(spacing: 10) {
+                    if editingBudget {
+                        HStack(spacing: 8) {
+                            Text(Fmt.currency == "IDR" ? "Rp" : Fmt.currency)
+                                .font(jakarta(13)).foregroundStyle(th.fg3)
+                            TextField("Daily budget", value: $budgetValue, format: .number)
+                                .textFieldStyle(.plain)
+                                .font(jakarta(14, .semibold)).monospacedDigit()
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(th.bg2)
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(th.accent, lineWidth: 1.5))
+                                .clipShape(RoundedRectangle(cornerRadius: 9))
+                            Text("/day").font(jakarta(12)).foregroundStyle(th.fg4)
+                            Spacer()
+                            Btn(variant: .ghost, size: .sm, label: "Cancel") { editingBudget = false }
+                            Btn(variant: .primary, size: .sm, label: "Stage change") {
+                                state.stageBudget(entityId: campaign.id, current: campaign.daily, to: budgetValue)
+                                editingBudget = false
+                            }
+                        }
+                    }
+                    HStack(spacing: 10) {
+                        Btn(variant: .secondary, icon: "doc.on.doc", label: "Duplicate") {
+                            state.duplicate(campaign)
+                        }
                         .frame(maxWidth: .infinity)
-                    Btn(variant: .secondary, icon: "pencil", label: "Edit budget") {}
+                        Btn(variant: .secondary, icon: "pencil",
+                            label: state.pendingBudgets[campaign.id] != nil
+                                ? "Budget → \(Fmt.money(state.pendingBudgets[campaign.id], compact: true))"
+                                : "Edit budget") {
+                            budgetValue = state.pendingBudgets[campaign.id] ?? campaign.daily
+                            editingBudget.toggle()
+                        }
                         .frame(maxWidth: .infinity)
+                        Menu {
+                            Button(state.pending[campaign.id] == .archived ? "Undo archive" : "Archive campaign") {
+                                state.toggle(entityId: campaign.id, kind: .campaign, name: campaign.name,
+                                             base: campaign.status,
+                                             to: state.pending[campaign.id] == .archived ? campaign.status : .archived)
+                            }
+                            Button(state.pendingDeletes.contains(campaign.id) ? "Undo delete" : "Delete campaign…",
+                                   role: .destructive) {
+                                state.stageDelete(entityId: campaign.id)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(width: 36, height: 36)
+                                .background(th.bg1)
+                                .foregroundStyle(th.fg2)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(th.borderStrong, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                    }
                 }
                 .padding(16)
                 .background(th.bg1)

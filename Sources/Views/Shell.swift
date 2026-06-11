@@ -100,6 +100,22 @@ private struct AccountCard: View {
     private var menuBody: some View {
         Menu {
             if state.mode == .live {
+                if state.accounts.count > 1 {
+                    Section("Ad accounts") {
+                        ForEach(state.accounts) { account in
+                            Button {
+                                state.switchAccount(account)
+                            } label: {
+                                if account.id == state.snapshot.account.accountId {
+                                    Label(account.name, systemImage: "checkmark")
+                                } else {
+                                    Text("\(account.name) · \(account.currency)")
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                }
                 Button("Refresh account") { Task { await state.reload() } }
                 Button("Switch to sample data") { state.switchToSample() }
             } else {

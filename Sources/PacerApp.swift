@@ -41,6 +41,83 @@ struct PacerApp: App {
                 .environmentObject(prefs)
                 .preferredColorScheme(prefs.appearance.colorScheme)
         }
+
+        // Today's pacing at a glance, always in the menu bar.
+        MenuBarExtra {
+            MenuBarPacing()
+                .environmentObject(state)
+                .environmentObject(prefs)
+        } label: {
+            Image(systemName: "bolt.fill")
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+struct MenuBarPacing: View {
+    @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var prefs: Prefs
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        let th = Theme(dark: scheme == .dark, accent: prefs.accent.color)
+        let account = state.snapshot.account
+        let pct = account.budget > 0 ? min(account.daySpend / account.budget, 1) : 0
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(account.name).font(jakarta(13, .bold)).foregroundStyle(th.fg1)
+                Spacer()
+                Text(state.mode == .live ? "Live" : state.mode == .sample ? "Sample" : "Not connected")
+                    .font(jakarta(10.5, .semibold))
+                    .foregroundStyle(state.mode == .live ? th.success : th.fg3)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Today").font(jakarta(11.5)).foregroundStyle(th.fg3)
+                    Spacer()
+                    (Text(Fmt.money(account.daySpend, compact: true)).bold()
+                     + Text(" / \(Fmt.money(account.budget, compact: true))"))
+                        .font(jakarta(11.5))
+                        .foregroundStyle(th.fg2)
+                }
+                Capsule().fill(th.bg3)
+                    .frame(height: 6)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { geo in
+                            Capsule().fill(pct > 0.9 ? th.warning : th.accent)
+                                .frame(width: geo.size.width * pct)
+                        }
+                    }
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ROAS · 7d").font(jakarta(10)).foregroundStyle(th.fg4)
+                    Text(Fmt.roas(state.snapshot.kpis.roas.value))
+                        .font(jakarta(15, .extra)).foregroundStyle(th.fg1)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("Staged").font(jakarta(10)).foregroundStyle(th.fg4)
+                    Text("\(state.pendingCount)")
+                        .font(jakarta(15, .extra))
+                        .foregroundStyle(state.pendingCount > 0 ? th.accent : th.fg1)
+                }
+            }
+            Divider()
+            HStack {
+                Button("Refresh") { Task { await state.reload() } }
+                    .disabled(state.mode != .live)
+                Spacer()
+                Button("Open MadMac") {
+                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
+                }
+            }
+            .font(jakarta(12))
+        }
+        .padding(14)
+        .frame(width: 240)
     }
 }
 

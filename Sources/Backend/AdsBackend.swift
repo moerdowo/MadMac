@@ -3,7 +3,9 @@ import Foundation
 protocol AdsBackend {
     var isLive: Bool { get }
     func loadSnapshot() async throws -> AccountSnapshot
-    func apply(changes: [StagedChange], draft: DraftCampaign?, launchLive: Bool) async throws
+    func apply(_ plan: ChangePlan) async throws -> ApplyReport
+    func pages() async throws -> [PageInfo]
+    func accounts() async throws -> [AccountInfo]
 }
 
 // Sample mode: AppState mutates its local copy after a (always-successful) apply.
@@ -12,7 +14,16 @@ struct SampleBackend: AdsBackend {
 
     func loadSnapshot() async throws -> AccountSnapshot { SampleData.snapshot }
 
-    func apply(changes: [StagedChange], draft: DraftCampaign?, launchLive: Bool) async throws {
+    func apply(_ plan: ChangePlan) async throws -> ApplyReport {
         try await Task.sleep(for: .milliseconds(600))   // feel the launch
+        return ApplyReport()
+    }
+
+    func pages() async throws -> [PageInfo] {
+        [PageInfo(id: "108880123456", name: "Lumio Skincare", category: "Beauty brand")]
+    }
+
+    func accounts() async throws -> [AccountInfo] {
+        [AccountInfo(id: SampleData.account.accountId, name: SampleData.account.name, currency: "IDR")]
     }
 }

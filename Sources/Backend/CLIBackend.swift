@@ -8,6 +8,7 @@ import SwiftUI
 //  - write commands print a human line *before* the JSON payload
 //  - list commands default to 10 rows → always pass --limit
 //  - statuses/objectives are lowercase choices; budgets are in minor units
+//  - adset create takes CAMPAIGN_ID positionally; ad create takes ADSET_ID
 
 struct CLIBackend: AdsBackend {
     let credentials: Credentials
@@ -26,6 +27,10 @@ struct CLIBackend: AdsBackend {
     // treat "No results." as an empty list.
     private func json(_ args: [String]) async throws -> Any {
         let out = try await run(args)
+        return try Self.parse(out)
+    }
+
+    static func parse(_ out: String) throws -> Any {
         let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.contains("No results") { return [[String: Any]]() }
         if let start = trimmed.firstIndex(where: { $0 == "[" || $0 == "{" }),
@@ -51,6 +56,25 @@ struct CLIBackend: AdsBackend {
 
     private func str(_ v: Any?) -> String { v as? String ?? "" }
 
+    private func createdId(_ out: String) -> String? {
+        guard let obj = try? Self.parse(out) else { return nil }
+        return rows(obj).first.map { str($0["id"]) }
+    }
+
+    // ── Reference data ─────────────────────────────────────────────────────
+
+    func pages() async throws -> [PageInfo] {
+        rows(try await json(["ads", "page", "list", "--limit", "50"])).map {
+            PageInfo(id: str($0["id"]), name: str($0["name"]), category: str($0["category"]))
+        }
+    }
+
+    func accounts() async throws -> [AccountInfo] {
+        rows(try await json(["ads", "adaccount", "list"])).map {
+            AccountInfo(id: str($0["id"]), name: str($0["name"]), currency: str($0["currency"]))
+        }
+    }
+
     // ── Snapshot ───────────────────────────────────────────────────────────
 
     func loadSnapshot() async throws -> AccountSnapshot {
@@ -74,8 +98,9 @@ struct CLIBackend: AdsBackend {
         let adsetRows = (try? await json(["ads", "adset", "list", "--limit", "500"])).map(rows) ?? []
         let adRows = (try? await json(["ads", "ad", "list", "--limit", "500"])).map(rows) ?? []
 
-        // Account-level daily series for the dashboard chart.
-        let dailyRows = (try? await json(["ads", "insights", "get", "--date-preset", "last_30d",
+        // 90 days of account-level daily data — the dashboard's range picker
+        // slices this client-side, so 7/30/90 are all real.
+        let dailyRows = (try? await json(["ads", "insights", "get", "--date-preset", "last_90d",
                                           "--time-increment", "daily",
                                           "--fields", "spend,actions,action_values"])).map(rows) ?? []
         var seriesSpend = dailyRows.map { num($0["spend"]) }
@@ -96,8 +121,6 @@ struct CLIBackend: AdsBackend {
             }
         }
 
-        // Hierarchy (ad set / ad metrics come from their parent's share; the
-        // CLI exposes per-entity insights only one call at a time).
         let thumbs: [Color] = [Color(hex: 0xE91E78), Color(hex: 0x2D3DEC), Color(hex: 0x1FB36B),
                                Color(hex: 0xF4A52A), Color(hex: 0x7A5AE0)]
         var adsByAdset: [String: [Ad]] = [:]
@@ -136,36 +159,170 @@ struct CLIBackend: AdsBackend {
         account.budget = campaigns.filter { $0.status == .active }.reduce(0) { $0 + $1.daily }
         account.daySpend = seriesSpend.last ?? 0
 
+        // Spend breakdowns (placement, demographics, geo) — skipped when the
+        // account has no spend at all to save rate budget.
+        var breakdowns = BreakdownData()
+        if seriesSpend.reduce(0, +) > 0 {
+            breakdowns.placements = await breakdown("platform_position")
+            breakdowns.ages = await breakdown("age")
+            breakdowns.genders = await breakdown("gender")
+            breakdowns.countries = Array(await breakdown("country").prefix(5))
+        }
+
+        // Pixels (datasets) for the Datasets section and the wizard's picker.
+        let pixels = ((try? await json(["ads", "dataset", "list", "--limit", "50"])).map(rows) ?? []).map {
+            PixelInfo(id: str($0["id"]), name: str($0["name"]), lastFired: str($0["last_fired_time"]))
+        }
+
         return AccountSnapshot(
             account: account,
             kpis: kpis(seriesSpend: seriesSpend, seriesRevenue: seriesRevenue, campaigns: campaigns),
             campaigns: campaigns,
-            diagnostics: liveDiagnostics(campaigns: campaigns),
+            diagnostics: liveDiagnostics(campaigns: campaigns, pixels: pixels),
             seriesSpend: seriesSpend, seriesRevenue: seriesRevenue, seriesRoas: seriesRoas,
-            products: [], events: [])
+            products: [], events: [],
+            pixels: pixels, breakdowns: breakdowns)
+    }
+
+    private func breakdown(_ dimension: String) async -> [BreakdownSlice] {
+        guard let obj = try? await json(["ads", "insights", "get", "--date-preset", "last_30d",
+                                         "--breakdown", dimension, "--fields", "spend"]) else { return [] }
+        return rows(obj).compactMap { row in
+            let spend = num(row["spend"])
+            guard spend > 0 else { return nil }
+            let raw = str(row[dimension])
+            let label = raw.isEmpty ? "Unknown"
+                : raw.replacingOccurrences(of: "_", with: " ").capitalized
+            return BreakdownSlice(label: label, value: spend)
+        }.sorted { $0.value > $1.value }
     }
 
     // ── Writes (the review sheet's Approve) ────────────────────────────────
 
-    func apply(changes: [StagedChange], draft: DraftCampaign?, launchLive: Bool) async throws {
-        for change in changes {
-            let noun: String
-            switch change.kind {
-            case .campaign: noun = "campaign"
-            case .adset: noun = "adset"
-            case .ad: noun = "ad"
-            }
-            _ = try await run(["ads", noun, "update", change.entityId,
-                               "--status", change.to == .active ? "active" : "paused"])
+    func apply(_ plan: ChangePlan) async throws -> ApplyReport {
+        var report = ApplyReport()
+
+        for change in plan.statusChanges {
+            _ = try await run(["ads", noun(change.kind), "update", change.entityId,
+                               "--status", change.to.rawValue])
         }
-        if let d = draft {
-            // The CLI creates campaigns PAUSED by default. Ad set + ad creation
-            // need page/pixel prerequisites, so v1 creates the campaign shell.
-            _ = try await run(["ads", "campaign", "create",
-                               "--name", d.name,
-                               "--objective", d.objective.apiValue,
-                               "--daily-budget", String(Int(d.daily * currencyOffset)),
-                               "--status", launchLive ? "active" : "paused"])
+        for change in plan.budgetChanges {
+            _ = try await run(["ads", noun(change.kind), "update", change.entityId,
+                               "--daily-budget", minorUnits(change.to)])
+        }
+        for del in plan.deletes {
+            _ = try await Sidecar.shared.meta(
+                ["--no-input", "ads", noun(del.kind), "delete", del.entityId, "--force"],
+                credentials: credentials)
+        }
+
+        if let d = plan.draft {
+            report = try await create(d, launchLive: plan.launchLive, report: report)
+        }
+        return report
+    }
+
+    // Full chain: campaign (CBO budget) → ad set → creative → ad.
+    // Everything is created paused unless launchLive.
+    private func create(_ d: DraftCampaign, launchLive: Bool, report: ApplyReport) async throws -> ApplyReport {
+        var report = report
+        let status = launchLive ? "active" : "paused"
+
+        let campaignOut = try await run(["ads", "campaign", "create",
+                                         "--name", d.name,
+                                         "--objective", d.objective.apiValue,
+                                         "--daily-budget", minorUnits(d.daily),
+                                         "--status", status])
+        guard let campaignId = createdId(campaignOut), !campaignId.isEmpty else {
+            throw SidecarError.commandFailed("Campaign created but its ID was not returned")
+        }
+        report.createdCampaignId = campaignId
+
+        var adsetArgs = ["ads", "adset", "create", campaignId,
+                         "--name", d.adsetName,
+                         "--optimization-goal", d.optimization.rawValue,
+                         "--billing-event", d.optimization.billingEvent,
+                         // the API rejects ad sets without a bid cap on this path
+                         "--bid-amount", minorUnits(max(d.bidAmount, 1)),
+                         "--status", status,
+                         "--targeting-countries", d.countries.replacingOccurrences(of: " ", with: "")]
+        if !d.pixelId.isEmpty {
+            adsetArgs += ["--pixel-id", d.pixelId, "--custom-event-type", d.conversionEvent.rawValue]
+        }
+        if d.schedule {
+            let iso = ISO8601DateFormatter()
+            adsetArgs += ["--start-time", iso.string(from: d.startDate),
+                          "--end-time", iso.string(from: d.endDate)]
+        }
+        let adsetOut: String
+        do {
+            adsetOut = try await run(adsetArgs)
+        } catch {
+            report.warnings.append("ad set failed: \(error.localizedDescription)")
+            return report
+        }
+        guard let adsetId = createdId(adsetOut), !adsetId.isEmpty else {
+            report.warnings.append("ad set created but ID missing — ad skipped")
+            return report
+        }
+
+        guard d.hasCreative else {
+            report.warnings.append(d.media.isEmpty ? "no creative media — ad skipped"
+                                                   : "no Facebook Page — ad skipped")
+            return report
+        }
+
+        var creativeArgs = ["ads", "creative", "create",
+                            "--name", "\(d.adName) — creative",
+                            "--page-id", d.pageId]
+        let videoExts = ["mp4", "mov", "avi", "mkv", "wmv"]
+        if d.isDCO {
+            for url in d.media.prefix(10) {
+                creativeArgs += [videoExts.contains(url.pathExtension.lowercased()) ? "--videos" : "--images", url.path]
+            }
+            for t in d.headlines.prefix(5) { creativeArgs += ["--titles", t] }
+            for b in d.texts.prefix(5) { creativeArgs += ["--bodies", b] }
+            creativeArgs += ["--call-to-actions", d.cta.rawValue]
+        } else {
+            if let url = d.media.first {
+                creativeArgs += [videoExts.contains(url.pathExtension.lowercased()) ? "--video" : "--image", url.path]
+            }
+            if let t = d.headlines.first { creativeArgs += ["--title", t] }
+            if let b = d.texts.first { creativeArgs += ["--body", b] }
+            creativeArgs += ["--call-to-action", d.cta.rawValue]
+        }
+        if !d.linkURL.isEmpty { creativeArgs += ["--link-url", d.linkURL] }
+
+        let creativeOut: String
+        do {
+            creativeOut = try await run(creativeArgs)
+        } catch {
+            report.warnings.append("creative failed: \(error.localizedDescription)")
+            return report
+        }
+        guard let creativeId = createdId(creativeOut), !creativeId.isEmpty else {
+            report.warnings.append("creative created but ID missing — ad skipped")
+            return report
+        }
+
+        var adArgs = ["ads", "ad", "create", adsetId,
+                      "--name", d.adName,
+                      "--creative-id", creativeId,
+                      "--status", status]
+        if !d.pixelId.isEmpty { adArgs += ["--pixel-id", d.pixelId] }
+        do {
+            _ = try await run(adArgs)
+        } catch {
+            report.warnings.append("ad failed: \(error.localizedDescription)")
+        }
+        return report
+    }
+
+    private func noun(_ kind: EntityKind) -> String {
+        switch kind {
+        case .campaign: return "campaign"
+        case .adset: return "adset"
+        case .ad: return "ad"
         }
     }
 
@@ -173,15 +330,18 @@ struct CLIBackend: AdsBackend {
 
     private var currencyOffset: Double {
         // Marketing API budgets are in minor units, except these currencies
-        // (Meta's documented offset-1 list — verified live for IDR: a raw
-        // daily_budget of 150000 is Rp 150,000 in Ads Manager, not Rp 1,500).
+        // (Meta's documented offset-1 list — verified live for IDR).
         ["CLP", "COP", "CRC", "HUF", "IDR", "ISK", "JPY", "KRW",
          "MWK", "PYG", "TWD", "UGX", "VND", "XAF", "XOF"].contains(Fmt.currency) ? 1 : 100
     }
 
+    private func minorUnits(_ v: Double) -> String { String(Int(v * currencyOffset)) }
+
     private func status(_ row: [String: Any]) -> EntityStatus {
         let s = (str(row["effective_status"]).isEmpty ? str(row["status"]) : str(row["effective_status"])).uppercased()
-        return s == "ACTIVE" ? .active : .paused
+        if s == "ACTIVE" { return .active }
+        if s == "ARCHIVED" { return .archived }
+        return .paused
     }
 
     private func objective(_ row: [String: Any]) -> Objective {
@@ -241,14 +401,13 @@ struct CLIBackend: AdsBackend {
                      series: Array(seriesSpend.suffix(7)), fmt: .money, invert: true))
     }
 
-    private func liveDiagnostics(campaigns: [Campaign]) -> [Diagnostic] {
+    private func liveDiagnostics(campaigns: [Campaign], pixels: [PixelInfo]) -> [Diagnostic] {
         var out: [Diagnostic] = []
         if campaigns.isEmpty {
             out.append(Diagnostic(id: "empty", level: .info, title: "No campaigns yet",
                                   target: "Account",
                                   detail: "Create your first campaign — it will be saved paused until you approve the launch plan.",
                                   icon: "sparkles"))
-            return out
         }
         for c in campaigns where c.status == .active && c.roas > 0 && c.roas < 1.5 {
             out.append(Diagnostic(id: "lo_\(c.id)", level: .danger, title: "ROAS below breakeven",
@@ -262,6 +421,12 @@ struct CLIBackend: AdsBackend {
                                   target: "\(paused) campaign\(paused == 1 ? "" : "s")",
                                   detail: "Saved but not delivering. Resume them from Campaigns when ready.",
                                   icon: "pause.circle"))
+        }
+        if let pixel = pixels.first(where: { !$0.lastFired.isEmpty }) {
+            out.append(Diagnostic(id: "px_\(pixel.id)", level: .success, title: "Pixel receiving events",
+                                  target: pixel.name,
+                                  detail: "Last event \(pixel.lastFired.prefix(10)). Use it in the create wizard for conversion tracking.",
+                                  icon: "checkmark.circle"))
         }
         if out.isEmpty {
             out.append(Diagnostic(id: "ok", level: .success, title: "No delivery issues detected",

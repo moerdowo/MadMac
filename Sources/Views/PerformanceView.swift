@@ -48,6 +48,9 @@ struct PerformanceView: View {
                 RevenueSpendCard(range: range).frame(maxWidth: .infinity)
                 PlacementDonutCard().frame(width: 340)
             }
+            if !state.snapshot.breakdowns.ages.isEmpty || !state.snapshot.breakdowns.genders.isEmpty {
+                DemographicsCard()
+            }
             HStack(alignment: .top, spacing: 14) {
                 Card(pad: 0) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -209,7 +212,7 @@ private struct RevenueSpendCard: View {
     @Environment(\.theme) private var th
 
     var body: some View {
-        let n = min(range == 7 ? 7 : 30, state.snapshot.seriesSpend.count)
+        let n = min(range, state.snapshot.seriesSpend.count)
         let spend = Array(state.snapshot.seriesSpend.suffix(n))
         let revenue = Array(state.snapshot.seriesRevenue.suffix(n))
         Card {
@@ -262,18 +265,16 @@ private struct PlacementDonutCard: View {
     @Environment(\.theme) private var th
 
     var body: some View {
-        let segments = [
-            DonutSegment(label: "Reels & Stories", value: 42, color: th.accent),
-            DonutSegment(label: "Feeds", value: 34, color: th.brandMagenta),
-            DonutSegment(label: "Advantage+", value: 18, color: th.warning),
-            DonutSegment(label: "Audience Network", value: 6, color: th.fg4),
-        ]
+        let slices = state.snapshot.breakdowns.placements
+        let palette = [th.accent, th.brandMagenta, th.warning, th.success, th.fg4]
+        let total = max(slices.reduce(0) { $0 + $1.value }, 1)
+        let segments = slices.prefix(5).enumerated().map { i, slice in
+            DonutSegment(label: slice.label, value: slice.value, color: palette[i % palette.count])
+        }
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Spend by placement").font(jakarta(15, .bold)).foregroundStyle(th.fg1)
-                // The placement split is part of the sample dataset only; live
-                // breakdowns need per-placement insight queries (not wired yet).
-                if state.mode == .live {
+                if segments.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "chart.pie")
                             .font(.system(size: 24))
@@ -286,31 +287,86 @@ private struct PlacementDonutCard: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
                 } else {
-                HStack(spacing: 18) {
-                    ZStack {
-                        DonutChart(segments: segments)
-                        VStack(spacing: 0) {
-                            Text(String(format: "%.1f×", state.snapshot.kpis.roas.value))
-                                .font(jakarta(18, .extra)).foregroundStyle(th.fg1)
-                            Text("blended").font(jakarta(10)).foregroundStyle(th.fg3)
+                    HStack(spacing: 18) {
+                        ZStack {
+                            DonutChart(segments: segments)
+                            VStack(spacing: 0) {
+                                Text(String(format: "%.1f×", state.snapshot.kpis.roas.value))
+                                    .font(jakarta(18, .extra)).foregroundStyle(th.fg1)
+                                Text("blended").font(jakarta(10)).foregroundStyle(th.fg3)
+                            }
                         }
-                    }
-                    VStack(spacing: 9) {
-                        ForEach(segments) { seg in
-                            HStack(spacing: 8) {
-                                RoundedRectangle(cornerRadius: 2).fill(seg.color).frame(width: 8, height: 8)
-                                Text(seg.label).font(jakarta(12.5)).foregroundStyle(th.fg2)
-                                Spacer()
-                                Text("\(Int(seg.value))%")
-                                    .font(jakarta(12.5, .bold)).monospacedDigit()
-                                    .foregroundStyle(th.fg1)
+                        VStack(spacing: 9) {
+                            ForEach(segments) { seg in
+                                HStack(spacing: 8) {
+                                    RoundedRectangle(cornerRadius: 2).fill(seg.color).frame(width: 8, height: 8)
+                                    Text(seg.label).font(jakarta(12.5)).foregroundStyle(th.fg2).lineLimit(1)
+                                    Spacer()
+                                    Text("\(Int((seg.value / total * 100).rounded()))%")
+                                        .font(jakarta(12.5, .bold)).monospacedDigit()
+                                        .foregroundStyle(th.fg1)
+                                }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Demographics card (age / gender / geo from insights breakdowns) ────────
+
+private struct DemographicsCard: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.theme) private var th
+
+    var body: some View {
+        let b = state.snapshot.breakdowns
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Audience · spend by demographic")
+                    .font(jakarta(15, .bold)).foregroundStyle(th.fg1)
+                HStack(alignment: .top, spacing: 28) {
+                    if !b.ages.isEmpty {
+                        breakdownColumn("Age", slices: b.ages, tint: th.accent)
+                    }
+                    if !b.genders.isEmpty {
+                        breakdownColumn("Gender", slices: b.genders, tint: th.brandMagenta)
+                    }
+                    if !b.countries.isEmpty {
+                        breakdownColumn("Country", slices: b.countries, tint: th.warning)
+                    }
                 }
             }
         }
+    }
+
+    private func breakdownColumn(_ title: String, slices: [BreakdownSlice], tint: Color) -> some View {
+        let maxV = max(slices.map(\.value).max() ?? 1, 1)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(jakarta(10.5, .bold)).kerning(0.5)
+                .foregroundStyle(th.fg4)
+            ForEach(slices) { slice in
+                HStack(spacing: 9) {
+                    Text(slice.label)
+                        .font(jakarta(12))
+                        .foregroundStyle(th.fg2)
+                        .frame(width: 64, alignment: .leading)
+                        .lineLimit(1)
+                    Capsule().fill(th.bg3)
+                        .frame(width: 110, height: 6)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(tint).frame(width: 110 * slice.value / maxV)
+                        }
+                    Text(Fmt.money(slice.value, compact: true))
+                        .font(jakarta(11.5, .semibold)).monospacedDigit()
+                        .foregroundStyle(th.fg3)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

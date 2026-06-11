@@ -87,7 +87,7 @@ struct StatusSwitch: View {
                              base: base, to: on ? .active : .paused)
             }
             if isPending {
-                Text(desired == .active ? "→ go live" : "→ pause")
+                Text(desired == .active ? "→ go live" : desired == .archived ? "→ archive" : "→ pause")
                     .font(jakarta(10.5, .bold))
                     .foregroundStyle(th.accent)
                     .padding(.horizontal, 7)
@@ -141,6 +141,24 @@ private struct CampaignBlock: View {
                 }
                 .buttonStyle(.plain)
 
+                if state.pendingDeletes.contains(campaign.id) {
+                    Text("→ delete")
+                        .font(jakarta(10.5, .bold))
+                        .foregroundStyle(th.danger)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(th.danger100))
+                        .fixedSize()
+                }
+                if let staged = state.pendingBudgets[campaign.id] {
+                    Text("→ \(Fmt.money(staged, compact: true))/d")
+                        .font(jakarta(10.5, .bold))
+                        .foregroundStyle(th.accent)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(th.accentSoft))
+                        .fixedSize()
+                }
                 MetricCol(label: "Spend", value: Fmt.money(campaign.spend, compact: true), width: 76)
                 MetricCol(label: secondMetricLabel,
                           value: secondMetricValue, width: 84)
@@ -152,6 +170,20 @@ private struct CampaignBlock: View {
             }
             .padding(14)
             .hoverRow()
+            .contextMenu {
+                Button("Open details") { state.drawerCampaignID = campaign.id }
+                Button("Duplicate") { state.duplicate(campaign) }
+                Divider()
+                Button(state.pending[campaign.id] == .archived ? "Undo archive" : "Archive") {
+                    state.toggle(entityId: campaign.id, kind: .campaign, name: campaign.name,
+                                 base: campaign.status,
+                                 to: state.pending[campaign.id] == .archived ? campaign.status : .archived)
+                }
+                Button(state.pendingDeletes.contains(campaign.id) ? "Undo delete" : "Delete…",
+                       role: .destructive) {
+                    state.stageDelete(entityId: campaign.id)
+                }
+            }
 
             if open {
                 ForEach(campaign.adsets) { adset in

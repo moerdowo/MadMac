@@ -25,8 +25,11 @@ Flipping any status switch or finishing the create wizard **stages** the change.
 
 ## Features
 
-- **Performance dashboard** — KPI cards with 7-day deltas and sparklines (spend, revenue, ROAS, purchases, CPA, CTR, reach, CPM), a revenue/spend chart, top campaigns, and a diagnostics feed. Three switchable layouts: Overview, Spotlight, Table.
-- **Campaigns** — an expandable campaign → ad set → ad tree with per-row metrics, learning-phase badges, search and status filters, a detail drawer, and a 3-step create wizard.
+- **Performance dashboard** — KPI cards with 7-day deltas and sparklines (spend, revenue, ROAS, purchases, CPA, CTR, reach, CPM), a revenue/spend chart with real 7/30/90-day ranges, spend-by-placement donut, audience demographics (age, gender, geo), top campaigns, and a diagnostics feed. Three switchable layouts: Overview, Spotlight, Table.
+- **Full campaign creation** — the 3-step wizard builds the whole chain: campaign (budget) → ad set (optimization goal, bid cap, countries, pixel + conversion event, optional schedule) → creative (drag-and-drop image/video upload, headline, primary text, link, CTA, Facebook Page picker) → ad. Multiple assets or copy variants become a dynamic-creative (DCO) ad automatically.
+- **Campaigns** — an expandable campaign → ad set → ad tree with per-row metrics, staged budget edits, duplicate, archive, and safe-delete (all gated behind the review sheet), search and status filters, and a detail drawer.
+- **Menu-bar pacing** — today's spend vs. budget, blended ROAS, and staged-change count, always one click away.
+- **Multi-account** — switch between every ad account your token can reach from the sidebar account card.
 
   ![Campaigns](docs/04-campaigns.png)
 

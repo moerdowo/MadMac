@@ -197,19 +197,51 @@ struct DatasetsView: View {
 
     var body: some View {
         let events = state.snapshot.events
+        let pixels = state.snapshot.pixels
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .bottom) {
                 sectionHeader("Datasets",
-                              events.isEmpty
-                              ? "No pixel events available for this account"
-                              : "\(state.snapshot.account.brand) Pixel · \(state.snapshot.account.accountId.replacingOccurrences(of: "act_", with: "")) · receiving events")
+                              pixels.isEmpty
+                              ? "No pixels available for this account"
+                              : "\(pixels.count) pixel\(pixels.count == 1 ? "" : "s") · use them in the create wizard for conversion tracking")
                 Spacer()
-                if !events.isEmpty { Pill(status: .active, text: "Connected") }
+                if pixels.contains(where: { !$0.lastFired.isEmpty }) {
+                    Pill(status: .active, text: "Receiving events")
+                }
             }
 
-            if events.isEmpty {
+            if !pixels.isEmpty && state.mode == .live {
+                Card(pad: 0) {
+                    VStack(spacing: 0) {
+                        Text("Pixels (datasets)")
+                            .font(jakarta(15, .bold)).foregroundStyle(th.fg1)
+                            .padding(.init(top: 16, leading: 20, bottom: 16, trailing: 20))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .overlay(alignment: .bottom) { Rectangle().fill(th.border).frame(height: 1) }
+                        ForEach(pixels) { pixel in
+                            HStack(spacing: 14) {
+                                Circle().fill(pixel.lastFired.isEmpty ? th.fg4 : th.success)
+                                    .frame(width: 9, height: 9)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(pixel.name).font(jakarta(14, .semibold)).foregroundStyle(th.fg1)
+                                    Text(pixel.id).font(jakarta(11.5)).foregroundStyle(th.fg4)
+                                }
+                                Spacer()
+                                Text(pixel.lastFired.isEmpty ? "No events yet"
+                                     : "Last event \(pixel.lastFired.prefix(10))")
+                                    .font(jakarta(12.5)).foregroundStyle(th.fg3)
+                            }
+                            .padding(.init(top: 14, leading: 20, bottom: 14, trailing: 20))
+                            .overlay(alignment: .bottom) { Rectangle().fill(th.border).frame(height: 1) }
+                            .hoverRow()
+                        }
+                    }
+                }
+            }
+
+            if events.isEmpty && pixels.isEmpty {
                 emptyState("cylinder.split.1x2", "Conversion datasets and pixel health appear here once events flow.")
-            } else {
+            } else if !events.isEmpty {
                 HStack(spacing: 14) {
                     dataStat("waveform.path.ecg", "231 rb", "Events / 7d")
                     dataStat("checkmark.seal", "8.4 / 10", "Event match quality")

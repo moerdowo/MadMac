@@ -3,9 +3,77 @@ import SwiftUI
 // ── Entity status ──────────────────────────────────────────────────────────
 
 enum EntityStatus: String, Codable {
-    case active, paused
+    case active, paused, archived
 
     var toggledOn: Bool { self == .active }
+}
+
+enum OptimizationGoal: String, CaseIterable, Identifiable {
+    case offsiteConversions = "offsite_conversions"
+    case linkClicks = "link_clicks"
+    case landingPageViews = "landing_page_views"
+    case leadGeneration = "lead_generation"
+    case reach = "reach"
+    case thruplay = "thruplay"
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .offsiteConversions: return "Conversions"
+        case .linkClicks: return "Link clicks"
+        case .landingPageViews: return "Landing page views"
+        case .leadGeneration: return "Leads"
+        case .reach: return "Reach"
+        case .thruplay: return "ThruPlay"
+        }
+    }
+    // billing event accepted with this goal (impressions is valid for all of these)
+    var billingEvent: String { "impressions" }
+
+    static func suggested(for objective: Objective) -> OptimizationGoal {
+        switch objective {
+        case .sales: return .offsiteConversions
+        case .leads: return .leadGeneration
+        case .traffic: return .linkClicks
+        case .awareness: return .reach
+        }
+    }
+}
+
+enum CTAType: String, CaseIterable, Identifiable {
+    case shopNow = "shop_now", learnMore = "learn_more", signUp = "sign_up",
+         buyNow = "buy_now", contactUs = "contact_us", subscribe = "subscribe",
+         getOffer = "get_offer", download = "download"
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .shopNow: return "Shop now"
+        case .learnMore: return "Learn more"
+        case .signUp: return "Sign up"
+        case .buyNow: return "Buy now"
+        case .contactUs: return "Contact us"
+        case .subscribe: return "Subscribe"
+        case .getOffer: return "Get offer"
+        case .download: return "Download"
+        }
+    }
+}
+
+enum ConversionEvent: String, CaseIterable, Identifiable {
+    case purchase, addToCart = "add_to_cart", lead,
+         completeRegistration = "complete_registration",
+         initiatedCheckout = "initiated_checkout", subscribe
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .purchase: return "Purchase"
+        case .addToCart: return "Add to cart"
+        case .lead: return "Lead"
+        case .completeRegistration: return "Registration"
+        case .initiatedCheckout: return "Checkout"
+        case .subscribe: return "Subscribe"
+        }
+    }
 }
 
 enum LearningPhase: String, Codable {
@@ -201,20 +269,118 @@ struct StagedChange: Identifiable {
     let to: EntityStatus
 }
 
+struct StagedBudget: Identifiable {
+    var id: String { entityId }
+    let entityId: String
+    let kind: EntityKind
+    let name: String
+    let from: Double
+    let to: Double
+}
+
+struct StagedDelete: Identifiable {
+    var id: String { entityId }
+    let entityId: String
+    let kind: EntityKind
+    let name: String
+}
+
 struct DraftCampaign {
     var name: String = "Prospecting — New"
     var objective: Objective = .sales
-    var daily: Double = 1_500_000
-    var audience: String = "Advantage+ audience"
-    var geo: String = "Indonesia"
-    var age: String = "18–45"
-    var adName: String = "UGC — Hook 15s"
-    var format: AdFormat = .video
-    var text: String = "Kulit lebih cerah dalam 2 minggu ✨ Coba Lumio hari ini."
+    var daily: Double = 150_000
+
+    // ad set
+    var countries: String = "ID"                 // ISO codes, comma-separated
+    var optimization: OptimizationGoal = .offsiteConversions
+    var bidAmount: Double = 20_000               // bid cap per result (Meta requires one via this API)
+    var pixelId: String = ""                     // empty = no conversion tracking
+    var conversionEvent: ConversionEvent = .purchase
+    var schedule: Bool = false
+    var startDate: Date = Date()
+    var endDate: Date = Date().addingTimeInterval(14 * 86400)
+
+    // creative
+    var adName: String = "Launch — Hook 15s"
+    var media: [URL] = []                        // local image/video files
+    var headline: String = ""
+    var text: String = ""
+    var extraHeadlines: String = ""              // one per line → DCO
+    var extraTexts: String = ""
+    var linkURL: String = ""
+    var cta: CTAType = .learnMore
+    var pageId: String = ""
+
+    var headlines: [String] {
+        ([headline] + extraHeadlines.components(separatedBy: .newlines))
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+    var texts: [String] {
+        ([text] + extraTexts.components(separatedBy: .newlines))
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+    var isDCO: Bool { media.count > 1 || headlines.count > 1 || texts.count > 1 }
+    var format: AdFormat {
+        let videoExts = ["mp4", "mov", "avi", "mkv", "wmv"]
+        if media.contains(where: { videoExts.contains($0.pathExtension.lowercased()) }) { return .video }
+        return media.count > 1 ? .carousel : .image
+    }
+    var hasCreative: Bool { !media.isEmpty && !pageId.isEmpty }
 
     var adsetName: String {
-        "\(audience.components(separatedBy: " —").first ?? audience) · \(age) · \(geo)"
+        "\(optimization.label) · \(countries)"
     }
+}
+
+// Everything one Approve can carry.
+struct ChangePlan {
+    var statusChanges: [StagedChange] = []
+    var budgetChanges: [StagedBudget] = []
+    var deletes: [StagedDelete] = []
+    var draft: DraftCampaign?
+    var launchLive: Bool = false
+
+    var count: Int { statusChanges.count + budgetChanges.count + deletes.count + (draft != nil ? 1 : 0) }
+}
+
+struct ApplyReport {
+    var createdCampaignId: String?
+    var warnings: [String] = []
+}
+
+// ── Reference data (pickers, switcher) ─────────────────────────────────────
+
+struct PageInfo: Identifiable {
+    let id: String
+    var name: String
+    var category: String
+}
+
+struct PixelInfo: Identifiable {
+    let id: String
+    var name: String
+    var lastFired: String   // ISO timestamp or ""
+}
+
+struct AccountInfo: Identifiable {
+    let id: String          // act_…
+    var name: String
+    var currency: String
+}
+
+// Spend breakdowns for the dashboard.
+struct BreakdownSlice: Identifiable {
+    var id: String { label }
+    var label: String
+    var value: Double       // spend
+}
+
+struct BreakdownData {
+    var placements: [BreakdownSlice] = []
+    var ages: [BreakdownSlice] = []
+    var genders: [BreakdownSlice] = []
+    var countries: [BreakdownSlice] = []
+    var isEmpty: Bool { placements.isEmpty && ages.isEmpty && genders.isEmpty && countries.isEmpty }
 }
 
 // Snapshot a backend hands the app.
@@ -228,4 +394,6 @@ struct AccountSnapshot {
     var seriesRoas: [Double]
     var products: [Product]
     var events: [DatasetEvent]
+    var pixels: [PixelInfo] = []
+    var breakdowns: BreakdownData = BreakdownData()
 }

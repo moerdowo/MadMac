@@ -28,12 +28,15 @@ final class AppState: ObservableObject {
     @Published var section: AppSection = .performance
 
     // staged-changes engine
-    @Published var pending: [String: EntityStatus] = [:]
+    @Published var pending: [String: EntityStatus] = [:]        // status / archive
+    @Published var pendingBudgets: [String: Double] = [:]       // entityId → new daily
+    @Published var pendingDeletes: Set<String> = []
     @Published var draft: DraftCampaign?
 
     // overlays
     @Published var drawerCampaignID: String?
     @Published var createOpen = false
+    @Published var createPrefill: DraftCampaign?
     @Published var reviewOpen = false
     @Published var connectOpen = false
 
@@ -42,6 +45,7 @@ final class AppState: ObservableObject {
     @Published var isLoading = false
     @Published var isApplying = false
     @Published var banner: Banner?
+    @Published var accounts: [AccountInfo] = []
     var backend: AdsBackend
 
     struct Banner: Identifiable {
@@ -50,8 +54,8 @@ final class AppState: ObservableObject {
         var isError: Bool
     }
 
-    // Start blank: live data if an account is connected, otherwise the connect
-    // prompt. Sample data only appears when explicitly chosen.
+    // Start blank: live data if an account is connected, otherwise the
+    // onboarding screen. Sample data only when explicitly chosen.
     init() {
         let snap = EmptyData.snapshot
         snapshot = snap
@@ -61,10 +65,11 @@ final class AppState: ObservableObject {
         if Credentials.load() != nil {
             switchToLive()
         }
-        // else: stay disconnected — RootView shows the onboarding screen.
     }
 
-    var pendingCount: Int { pendingChanges().count + (draft != nil ? 1 : 0) }
+    // ── Staging ────────────────────────────────────────────────────────────
+
+    var pendingCount: Int { buildPlan(launchLive: false).count }
 
     func effectiveStatus(_ id: String, base: EntityStatus) -> EntityStatus {
         pending[id] ?? base
@@ -75,40 +80,71 @@ final class AppState: ObservableObject {
         else { pending[entityId] = to }
     }
 
-    func pendingChanges() -> [StagedChange] {
-        var lookup: [String: (EntityKind, String, EntityStatus)] = [:]
-        for c in campaigns {
-            lookup[c.id] = (.campaign, c.name, c.status)
-            for a in c.adsets {
-                lookup[a.id] = (.adset, a.name, a.status)
-                for ad in a.ads { lookup[ad.id] = (.ad, ad.name, ad.status) }
-            }
-        }
-        return pending.compactMap { id, to in
-            guard let (kind, name, base) = lookup[id], base != to else { return nil }
-            return StagedChange(entityId: id, kind: kind, name: name, base: base, to: to)
-        }.sorted { $0.name < $1.name }
+    func stageBudget(entityId: String, current: Double, to: Double?) {
+        if let to, to > 0, to != current { pendingBudgets[entityId] = to }
+        else { pendingBudgets.removeValue(forKey: entityId) }
+    }
+
+    func stageDelete(entityId: String) {
+        if pendingDeletes.contains(entityId) { pendingDeletes.remove(entityId) }
+        else { pendingDeletes.insert(entityId) }
     }
 
     func discard() {
         pending = [:]
+        pendingBudgets = [:]
+        pendingDeletes = []
         draft = nil
     }
 
+    // Name/kind/base lookup across the tree.
+    private func entityIndex() -> [String: (EntityKind, String, EntityStatus, Double)] {
+        var index: [String: (EntityKind, String, EntityStatus, Double)] = [:]
+        for c in campaigns {
+            index[c.id] = (.campaign, c.name, c.status, c.daily)
+            for a in c.adsets {
+                index[a.id] = (.adset, a.name, a.status, a.daily)
+                for ad in a.ads { index[ad.id] = (.ad, ad.name, ad.status, 0) }
+            }
+        }
+        return index
+    }
+
+    func buildPlan(launchLive: Bool) -> ChangePlan {
+        let index = entityIndex()
+        var plan = ChangePlan(draft: draft, launchLive: launchLive)
+        plan.statusChanges = pending.compactMap { id, to in
+            guard let (kind, name, base, _) = index[id], base != to,
+                  !pendingDeletes.contains(id) else { return nil }
+            return StagedChange(entityId: id, kind: kind, name: name, base: base, to: to)
+        }.sorted { $0.name < $1.name }
+        plan.budgetChanges = pendingBudgets.compactMap { id, to in
+            guard let (kind, name, _, from) = index[id], from != to,
+                  !pendingDeletes.contains(id) else { return nil }
+            return StagedBudget(entityId: id, kind: kind, name: name, from: from, to: to)
+        }.sorted { $0.name < $1.name }
+        plan.deletes = pendingDeletes.compactMap { id in
+            guard let (kind, name, _, _) = index[id] else { return nil }
+            return StagedDelete(entityId: id, kind: kind, name: name)
+        }.sorted { $0.name < $1.name }
+        return plan
+    }
+
     // ── Approve & launch ───────────────────────────────────────────────────
+
     func approve(launchLive: Bool) async {
-        let changes = pendingChanges()
+        let plan = buildPlan(launchLive: launchLive)
         isApplying = true
         defer { isApplying = false }
         do {
-            try await backend.apply(changes: changes, draft: draft, launchLive: launchLive)
-            applyLocally(changes: changes, launchLive: launchLive)
-            let n = changes.count + (draft != nil ? 1 : 0)
-            banner = Banner(text: mode == .live
-                ? "\(n) change\(n == 1 ? "" : "s") applied to \(snapshot.account.accountId)"
-                : "\(n) change\(n == 1 ? "" : "s") applied (sample mode)", isError: false)
-            pending = [:]
-            draft = nil
+            let report = try await backend.apply(plan)
+            applyLocally(plan: plan, createdId: report.createdCampaignId)
+            var text = "\(plan.count) change\(plan.count == 1 ? "" : "s") applied"
+            if mode == .live { text += " to \(snapshot.account.accountId)" }
+            banner = Banner(text: report.warnings.isEmpty ? text
+                            : text + " · " + report.warnings.joined(separator: " · "),
+                            isError: false)
+            discard()
             reviewOpen = false
             section = .campaigns
             if mode == .live { await reload() }
@@ -117,14 +153,19 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func applyLocally(changes: [StagedChange], launchLive: Bool) {
-        campaigns = campaigns.map { c in
+    private func applyLocally(plan: ChangePlan, createdId: String?) {
+        campaigns = campaigns.compactMap { c in
+            if pendingDeletes.contains(c.id) { return nil }
             var c = c
             c.status = pending[c.id] ?? c.status
-            c.adsets = c.adsets.map { a in
+            c.daily = pendingBudgets[c.id] ?? c.daily
+            c.adsets = c.adsets.compactMap { a in
+                if pendingDeletes.contains(a.id) { return nil }
                 var a = a
                 a.status = pending[a.id] ?? a.status
-                a.ads = a.ads.map { ad in
+                a.daily = pendingBudgets[a.id] ?? a.daily
+                a.ads = a.ads.compactMap { ad in
+                    if pendingDeletes.contains(ad.id) { return nil }
                     var ad = ad
                     ad.status = pending[ad.id] ?? ad.status
                     return ad
@@ -132,24 +173,44 @@ final class AppState: ObservableObject {
                 return a
             }
             return c
-        }
-        if let d = draft {
-            let status: EntityStatus = launchLive ? .active : .paused
+        }.filter { $0.status != .archived }
+
+        if let d = plan.draft {
+            let status: EntityStatus = plan.launchLive ? .active : .paused
             let new = Campaign(
-                id: String(Int.random(in: 23900...23990)), name: d.name, objective: d.objective,
+                id: createdId ?? "new_\(UUID().uuidString.prefix(6))",
+                name: d.name, objective: d.objective,
                 status: status, daily: d.daily, spend: 0, revenue: 0, roas: 0,
                 purchases: 0, cpa: 0, ctr: 0, learning: .active,
                 adsets: [AdSet(id: "as_\(UUID().uuidString.prefix(6))", name: d.adsetName, status: status,
                                daily: d.daily, spend: 0, revenue: 0, roas: 0, purchases: 0, cpa: 0, ctr: 0,
-                               learning: .learning, audience: d.audience, placements: "Advantage+ placements",
-                               ads: [Ad(id: "ad_\(UUID().uuidString.prefix(6))", name: d.adName, status: status,
-                                        spend: 0, revenue: 0, roas: 0, ctr: 0, format: d.format,
-                                        thumb: Color(hex: 0xE91E78))])])
+                               learning: .learning, audience: d.optimization.label,
+                               placements: "Advantage+ placements",
+                               ads: d.hasCreative ? [Ad(id: "ad_\(UUID().uuidString.prefix(6))", name: d.adName,
+                                                        status: status, spend: 0, revenue: 0, roas: 0, ctr: 0,
+                                                        format: d.format, thumb: Color(hex: 0xE91E78))] : [])])
             campaigns.insert(new, at: 0)
         }
     }
 
+    // ── Duplicate ──────────────────────────────────────────────────────────
+
+    func duplicate(_ campaign: Campaign) {
+        var d = DraftCampaign()
+        d.name = campaign.name + " — copy"
+        d.objective = campaign.objective
+        d.daily = campaign.daily > 0 ? campaign.daily : d.daily
+        d.optimization = .suggested(for: campaign.objective)
+        if let firstAd = campaign.adsets.first?.ads.first {
+            d.adName = firstAd.name
+        }
+        createPrefill = d
+        drawerCampaignID = nil
+        createOpen = true
+    }
+
     // ── Backend switching ──────────────────────────────────────────────────
+
     func switchToLive() {
         guard let creds = Credentials.load() else {
             connectOpen = true
@@ -166,9 +227,17 @@ final class AppState: ObservableObject {
         let snap = SampleData.snapshot
         snapshot = snap
         campaigns = snap.campaigns
+        accounts = []
         Fmt.currency = snap.account.currency
-        pending = [:]
-        draft = nil
+        discard()
+    }
+
+    func switchAccount(_ account: AccountInfo) {
+        guard var creds = Credentials.load(), creds.actId != account.id else { return }
+        creds.accountId = account.id
+        try? creds.save()
+        discard()
+        switchToLive()
     }
 
     func reload() async {
@@ -177,8 +246,11 @@ final class AppState: ObservableObject {
         do {
             let snap = try await backend.loadSnapshot()
             snapshot = snap
-            campaigns = snap.campaigns
+            campaigns = snap.campaigns.filter { $0.status != .archived }
             Fmt.currency = snap.account.currency
+            if mode == .live {
+                accounts = (try? await backend.accounts()) ?? []
+            }
         } catch {
             banner = Banner(text: "Couldn't load account: \(error.localizedDescription)", isError: true)
         }

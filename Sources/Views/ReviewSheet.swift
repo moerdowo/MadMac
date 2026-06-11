@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The hero: spec-review / approve-to-launch sheet (create.jsx ReviewSheet).
+// The hero: spec-review / approve-to-launch sheet.
 // Nothing touches the account until Approve.
 
 struct ReviewSheet: View {
@@ -9,9 +9,8 @@ struct ReviewSheet: View {
     @State private var launchLive = false
 
     var body: some View {
-        let changes = state.pendingChanges()
-        let goLive = changes.filter { $0.to == .active }.count
-        let total = changes.count + (state.draft != nil ? 1 : 0)
+        let plan = state.buildPlan(launchLive: launchLive)
+        let goLive = plan.statusChanges.filter { $0.to == .active }.count
 
         ZStack {
             Color(hex: 0x0E0F1A).opacity(0.5)
@@ -31,7 +30,7 @@ struct ReviewSheet: View {
                         Text("Review launch plan")
                             .font(jakarta(19, .extra)).kerning(-0.2)
                             .foregroundStyle(th.fg1)
-                        Text("\(total) change\(total == 1 ? "" : "s") staged · nothing is live until you approve")
+                        Text("\(plan.count) change\(plan.count == 1 ? "" : "s") staged · nothing is live until you approve")
                             .font(jakarta(12.5)).foregroundStyle(th.fg3)
                     }
                     Spacer()
@@ -45,8 +44,14 @@ struct ReviewSheet: View {
                     if let draft = state.draft {
                         createSpec(draft)
                     }
-                    if !changes.isEmpty {
-                        statusChanges(changes)
+                    if !plan.statusChanges.isEmpty {
+                        statusSection(plan.statusChanges)
+                    }
+                    if !plan.budgetChanges.isEmpty {
+                        budgetSection(plan.budgetChanges)
+                    }
+                    if !plan.deletes.isEmpty {
+                        deleteSection(plan.deletes)
                     }
                     if goLive > 0 || state.draft != nil {
                         warning
@@ -70,7 +75,7 @@ struct ReviewSheet: View {
                              + Text(" · otherwise saved paused").font(jakarta(13)).foregroundStyle(th.fg3))
                         }
                     } else {
-                        Text("\(goLive) going live · \(changes.count - goLive) pausing")
+                        Text(footerSummary(plan, goLive: goLive))
                             .font(jakarta(12.5)).foregroundStyle(th.fg3)
                     }
                     Spacer()
@@ -80,7 +85,7 @@ struct ReviewSheet: View {
                     }
                     Btn(variant: .primary, icon: "paperplane.fill",
                         label: state.draft != nil && !launchLive ? "Approve & save paused" : "Approve & launch",
-                        disabled: total == 0 || state.isApplying) {
+                        disabled: plan.count == 0 || state.isApplying) {
                         Task { await state.approve(launchLive: launchLive) }
                     }
                 }
@@ -95,13 +100,21 @@ struct ReviewSheet: View {
         }
     }
 
+    private func footerSummary(_ plan: ChangePlan, goLive: Int) -> String {
+        var parts: [String] = []
+        if !plan.statusChanges.isEmpty {
+            parts.append("\(goLive) going live · \(plan.statusChanges.count - goLive) pausing")
+        }
+        if !plan.budgetChanges.isEmpty { parts.append("\(plan.budgetChanges.count) budget edit\(plan.budgetChanges.count == 1 ? "" : "s")") }
+        if !plan.deletes.isEmpty { parts.append("\(plan.deletes.count) deletion\(plan.deletes.count == 1 ? "" : "s")") }
+        return parts.joined(separator: " · ")
+    }
+
     // ── Create spec tree ───────────────────────────────────────────────────
 
     private func createSpec(_ draft: DraftCampaign) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("CREATE")
-                .font(jakarta(11.5, .bold)).kerning(0.6)
-                .foregroundStyle(th.fg3)
+            sectionLabel("Create")
             VStack(spacing: 0) {
                 SpecNode(level: "Campaign", icon: "folder", name: draft.name,
                          pill: .draft, indent: 0, last: false) {
@@ -110,27 +123,54 @@ struct ReviewSheet: View {
                 }
                 SpecNode(level: "Ad set", icon: "person.2", name: draft.adsetName,
                          indent: 1, last: false) {
-                    SpecLine(icon: "person.2", label: "Audience", value: draft.audience)
-                    SpecLine(icon: "mappin.and.ellipse", label: "Location", value: draft.geo)
-                    SpecLine(icon: "calendar", label: "Age", value: draft.age)
+                    SpecLine(icon: "scope", label: "Optimize for", value: draft.optimization.label)
+                    SpecLine(icon: "gauge.with.needle", label: "Bid cap", value: Fmt.money(draft.bidAmount) + " / result")
+                    SpecLine(icon: "mappin.and.ellipse", label: "Countries", value: draft.countries)
+                    if !draft.pixelId.isEmpty {
+                        SpecLine(icon: "dot.radiowaves.up.forward", label: "Pixel",
+                                 value: "\(draft.pixelId) · \(draft.conversionEvent.label)")
+                    }
+                    if draft.schedule {
+                        SpecLine(icon: "calendar", label: "Schedule",
+                                 value: "\(draft.startDate.formatted(date: .abbreviated, time: .shortened)) → \(draft.endDate.formatted(date: .abbreviated, time: .shortened))")
+                    }
                 }
                 SpecNode(level: "Ad", icon: "photo", name: draft.adName,
                          indent: 2, last: true) {
-                    SpecLine(icon: "rectangle.on.rectangle", label: "Format", value: draft.format.rawValue)
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "textformat")
-                            .font(.system(size: 12))
-                            .foregroundStyle(th.fg4)
-                            .frame(width: 16)
-                        Text("Primary text")
-                            .font(jakarta(12.5)).foregroundStyle(th.fg3)
-                            .frame(width: 96, alignment: .leading)
-                        Text("\u{201C}\(draft.text)\u{201D}")
-                            .font(jakarta(12.5)).italic()
-                            .foregroundStyle(th.fg2)
-                            .lineSpacing(2)
+                    if draft.media.isEmpty {
+                        SpecLine(icon: "exclamationmark.triangle", label: "Media",
+                                 value: "none — ad will be skipped")
+                    } else {
+                        SpecLine(icon: "photo.on.rectangle", label: "Media",
+                                 value: draft.media.map(\.lastPathComponent).joined(separator: ", "))
                     }
-                    .padding(.vertical, 7)
+                    if draft.isDCO {
+                        SpecLine(icon: "sparkles", label: "Dynamic",
+                                 value: "\(draft.media.count) assets · \(draft.headlines.count) headlines · \(draft.texts.count) texts")
+                    }
+                    if let headline = draft.headlines.first, !headline.isEmpty {
+                        SpecLine(icon: "textformat.size", label: "Headline", value: headline)
+                    }
+                    if !draft.linkURL.isEmpty {
+                        SpecLine(icon: "link", label: "Link", value: draft.linkURL)
+                    }
+                    SpecLine(icon: "hand.tap", label: "CTA", value: draft.cta.label)
+                    if let text = draft.texts.first, !text.isEmpty {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "textformat")
+                                .font(.system(size: 12))
+                                .foregroundStyle(th.fg4)
+                                .frame(width: 16)
+                            Text("Primary text")
+                                .font(jakarta(12.5)).foregroundStyle(th.fg3)
+                                .frame(width: 96, alignment: .leading)
+                            Text("\u{201C}\(text)\u{201D}")
+                                .font(jakarta(12.5)).italic()
+                                .foregroundStyle(th.fg2)
+                                .lineSpacing(2)
+                        }
+                        .padding(.vertical, 7)
+                    }
                 }
             }
             .background(th.bg1)
@@ -139,36 +179,82 @@ struct ReviewSheet: View {
         }
     }
 
-    // ── Status change diffs ────────────────────────────────────────────────
+    // ── Status / budget / delete sections ──────────────────────────────────
 
-    private func statusChanges(_ changes: [StagedChange]) -> some View {
+    private func statusSection(_ changes: [StagedChange]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("STATUS CHANGES")
-                .font(jakarta(11.5, .bold)).kerning(0.6)
-                .foregroundStyle(th.fg3)
+            sectionLabel("Status changes")
             ForEach(changes) { change in
-                HStack(spacing: 12) {
-                    Text(change.kind.rawValue.uppercased())
-                        .font(jakarta(10.5, .bold)).kerning(0.3)
-                        .foregroundStyle(th.fg4)
-                        .frame(width: 64, alignment: .leading)
-                    Text(change.name)
-                        .font(jakarta(13.5, .semibold))
-                        .foregroundStyle(th.fg1)
-                        .lineLimit(1)
-                    Spacer()
+                changeRow(kind: change.kind, name: change.name) {
                     Pill(status: PillStatus(change.base), dot: false)
                     Image(systemName: "arrow.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(th.fg4)
                     Pill(status: PillStatus(change.to), dot: false)
                 }
-                .padding(.init(top: 12, leading: 14, bottom: 12, trailing: 14))
-                .background(th.bg1)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(th.border, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
+    }
+
+    private func budgetSection(_ changes: [StagedBudget]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("Budget changes")
+            ForEach(changes) { change in
+                changeRow(kind: change.kind, name: change.name) {
+                    Text(Fmt.money(change.from, compact: true))
+                        .font(jakarta(12.5, .semibold)).monospacedDigit()
+                        .foregroundStyle(th.fg3)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(th.fg4)
+                    Text(Fmt.money(change.to, compact: true) + "/day")
+                        .font(jakarta(12.5, .bold)).monospacedDigit()
+                        .foregroundStyle(change.to > change.from ? th.warning : th.fg1)
+                }
+            }
+        }
+    }
+
+    private func deleteSection(_ deletes: [StagedDelete]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("Delete")
+            ForEach(deletes) { del in
+                changeRow(kind: del.kind, name: del.name) {
+                    Text("Deleted permanently")
+                        .font(jakarta(12, .bold))
+                        .foregroundStyle(th.danger)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(th.danger100))
+                }
+            }
+        }
+    }
+
+    private func changeRow<Trailing: View>(kind: EntityKind, name: String,
+                                           @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 12) {
+            Text(kind.rawValue.uppercased())
+                .font(jakarta(10.5, .bold)).kerning(0.3)
+                .foregroundStyle(th.fg4)
+                .frame(width: 64, alignment: .leading)
+            Text(name)
+                .font(jakarta(13.5, .semibold))
+                .foregroundStyle(th.fg1)
+                .lineLimit(1)
+            Spacer()
+            trailing()
+        }
+        .padding(.init(top: 12, leading: 14, bottom: 12, trailing: 14))
+        .background(th.bg1)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(th.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(jakarta(11.5, .bold)).kerning(0.6)
+            .foregroundStyle(th.fg3)
     }
 
     private var warning: some View {
@@ -249,7 +335,7 @@ private struct SpecLine: View {
     @Environment(\.theme) private var th
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12))
                 .foregroundStyle(th.fg4)
@@ -259,6 +345,7 @@ private struct SpecLine: View {
                 .frame(width: 96, alignment: .leading)
             Text(value)
                 .font(jakarta(13, .semibold)).foregroundStyle(th.fg1)
+                .lineLimit(2)
         }
         .padding(.vertical, 7)
     }

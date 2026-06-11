@@ -6,12 +6,13 @@ import SwiftUI
 // ── Status pill ────────────────────────────────────────────────────────────
 
 enum PillStatus {
-    case active, paused, learning, draft, error
+    case active, paused, archived, learning, draft, error
 
     func label(_: Theme) -> String {
         switch self {
         case .active: return "Active"
         case .paused: return "Paused"
+        case .archived: return "Archived"
         case .learning: return "Learning"
         case .draft: return "Draft"
         case .error: return "Error"
@@ -20,7 +21,7 @@ enum PillStatus {
     func fg(_ th: Theme) -> Color {
         switch self {
         case .active: return th.success
-        case .paused, .draft: return th.fg3
+        case .paused, .draft, .archived: return th.fg3
         case .learning: return th.warning
         case .error: return th.danger
         }
@@ -28,13 +29,19 @@ enum PillStatus {
     func bg(_ th: Theme) -> Color {
         switch self {
         case .active: return th.success100
-        case .paused, .draft: return th.bg3
+        case .paused, .draft, .archived: return th.bg3
         case .learning: return th.warning100
         case .error: return th.danger100
         }
     }
 
-    init(_ s: EntityStatus) { self = s == .active ? .active : .paused }
+    init(_ s: EntityStatus) {
+        switch s {
+        case .active: self = .active
+        case .paused: self = .paused
+        case .archived: self = .archived
+        }
+    }
 }
 
 struct Pill: View {

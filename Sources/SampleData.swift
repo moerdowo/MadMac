@@ -133,11 +133,30 @@ enum SampleData {
         DatasetEvent(name: "Lead", count: 486, matchRate: 94.0, healthy: true),
     ]
 
+    static var breakdowns: BreakdownData {
+        BreakdownData(
+            placements: [BreakdownSlice(label: "Reels & Stories", value: 14_100_000),
+                         BreakdownSlice(label: "Feeds", value: 11_400_000),
+                         BreakdownSlice(label: "Advantage+", value: 6_000_000),
+                         BreakdownSlice(label: "Audience Network", value: 2_000_000)],
+            ages: [BreakdownSlice(label: "18-24", value: 7_400_000),
+                   BreakdownSlice(label: "25-34", value: 13_200_000),
+                   BreakdownSlice(label: "35-44", value: 8_600_000),
+                   BreakdownSlice(label: "45-54", value: 3_300_000),
+                   BreakdownSlice(label: "55+", value: 1_000_000)],
+            genders: [BreakdownSlice(label: "Female", value: 23_800_000),
+                      BreakdownSlice(label: "Male", value: 8_700_000),
+                      BreakdownSlice(label: "Unknown", value: 1_000_000)],
+            countries: [BreakdownSlice(label: "ID", value: 33_500_000)])
+    }
+
     static var snapshot: AccountSnapshot {
         AccountSnapshot(account: account, kpis: kpis, campaigns: campaigns,
                         diagnostics: diagnostics,
                         seriesSpend: seriesSpend, seriesRevenue: seriesRevenue, seriesRoas: seriesRoas,
-                        products: products, events: events)
+                        products: products, events: events,
+                        pixels: [PixelInfo(id: "408827145", name: "Lumio Pixel", lastFired: "2026-06-10T12:00:00+0000")],
+                        breakdowns: breakdowns)
     }
 }
 
