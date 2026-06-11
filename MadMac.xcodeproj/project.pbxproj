@@ -21,8 +21,10 @@
 		5D9CBB57089814EF6CB938B8 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = D23D0E8204AA3AA844BED8E2 /* Format.swift */; };
 		61C4701BE71559895AB46CC6 /* SnapshotRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95EA72C420F79371539A328C /* SnapshotRunner.swift */; };
 		6A713F763194624D754AB9D8 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E76A74ED39EFC10C3069B /* AppState.swift */; };
+		737CC924E12A4214EBE20711 /* Analyst.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF723962720BC46C30F83462 /* Analyst.swift */; };
 		773D835CD358FDA35C1577A1 /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F234915DB6E6098723D00AB /* PerformanceView.swift */; };
 		8312A9A8D15ED1341CC43982 /* Shell.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B013D84C4C7DE845C4B917 /* Shell.swift */; };
+		84DB68323F473FE4F580539B /* AnalystView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D52B7BEBD95E8D5805D207 /* AnalystView.swift */; };
 		871D0302EF409FE1A0BB0089 /* CampaignDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0F9D4D56F6A66D8C1F06D /* CampaignDrawer.swift */; };
 		B18A826EAEA98FCB5E79E5B8 /* CampaignsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966B5AC58B2FC730BBB40F54 /* CampaignsView.swift */; };
 		B49E226D28BFF0FB0024C3BA /* OpenAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687EAAB557292E8E752F3A74 /* OpenAIClient.swift */; };
@@ -50,6 +52,7 @@
 		43C80C0C75CA7A7C35240BB4 /* Sidecar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidecar.swift; sourceTree = "<group>"; };
 		4D4C1F6F39E3052439610DF1 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
 		4F9EBF24C94B97DCD4B26CD9 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		56D52B7BEBD95E8D5805D207 /* AnalystView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalystView.swift; sourceTree = "<group>"; };
 		62557BDD2E528C0CED8C7755 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		640078FA8C415D6FA051C7F5 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		67F4C785158B6776597C2FDA /* PlusJakartaSans-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans-Italic.ttf"; sourceTree = "<group>"; };
@@ -72,6 +75,7 @@
 		D378FB39459D47CF42777D7C /* AIPrefs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPrefs.swift; sourceTree = "<group>"; };
 		E2BF3C0401BF9FD1C7DD9BFE /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		E4E11957831B089CAA38C969 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		EF723962720BC46C30F83462 /* Analyst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analyst.swift; sourceTree = "<group>"; };
 		F78CADA6300F2F50DFE31C05 /* AISheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISheets.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -82,6 +86,7 @@
 				D378FB39459D47CF42777D7C /* AIPrefs.swift */,
 				71899CEDFB1AC13D2F531D55 /* AIService.swift */,
 				F78CADA6300F2F50DFE31C05 /* AISheets.swift */,
+				EF723962720BC46C30F83462 /* Analyst.swift */,
 				C6D01FBF6EBAED8885B90EE9 /* BriefSheet.swift */,
 				687EAAB557292E8E752F3A74 /* OpenAIClient.swift */,
 			);
@@ -163,6 +168,7 @@
 		F5DFC737ACEDC1ED53F190EE /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				56D52B7BEBD95E8D5805D207 /* AnalystView.swift */,
 				B1A0F9D4D56F6A66D8C1F06D /* CampaignDrawer.swift */,
 				966B5AC58B2FC730BBB40F54 /* CampaignsView.swift */,
 				E4E11957831B089CAA38C969 /* Components.swift */,
@@ -251,6 +257,8 @@
 				C1FF98F8146D1D53CC3A9CF5 /* AIService.swift in Sources */,
 				3F7F921987778400115DE419 /* AISheets.swift in Sources */,
 				3A021AACD071CDC17E2EC8BF /* AdsBackend.swift in Sources */,
+				737CC924E12A4214EBE20711 /* Analyst.swift in Sources */,
+				84DB68323F473FE4F580539B /* AnalystView.swift in Sources */,
 				6A713F763194624D754AB9D8 /* AppState.swift in Sources */,
 				59CE51B2A88825051CBAE703 /* BriefSheet.swift in Sources */,
 				C3797B3F4252945A7BC36D16 /* CLIBackend.swift in Sources */,

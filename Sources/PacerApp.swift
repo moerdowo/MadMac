@@ -177,6 +177,7 @@ struct RootView: View {
         let content = Group {
             switch state.section {
             case .performance: PerformanceView()
+            case .analyst: AnalystView()
             case .campaigns: CampaignsListView()
             case .catalog: CatalogView()
             case .diagnostics: DiagnosticsView()

@@ -386,6 +386,49 @@ struct BreakdownData {
     var isEmpty: Bool { placements.isEmpty && ages.isEmpty && genders.isEmpty && countries.isEmpty }
 }
 
+// ── Analyst: per-ad performance over a recent window ───────────────────────
+
+struct AdPerf: Identifiable {
+    var id: String { adId }
+    let adId: String
+    var name: String
+    var campaignId: String
+    var campaignName: String
+    var adsetId: String
+    var status: EntityStatus
+    // last 7 days vs the 7 before
+    var spend7: Double
+    var spendPrev7: Double
+    var roas7: Double
+    var roasPrev7: Double
+    var cpa7: Double          // 0 = no purchases
+    var cpaPrev7: Double
+    var ctr7: Double
+    var ctrPrev7: Double
+    var frequency: Double     // avg over the window
+    var dailyCtr: [Double]    // newest last, for slope + sparkline
+    var dailySpend: [Double]
+
+    // Deterministic signals (no AI involved)
+    var ctrSlope: Double {    // % change per day over the recent week
+        let recent = Array(dailyCtr.suffix(7))
+        guard recent.count >= 4, let first = recent.first, first > 0 else { return 0 }
+        return ((recent.last! - first) / first) / Double(recent.count) * 100
+    }
+    var isWinner: Bool { spend7 > 0 && roas7 >= 3 && roas7 >= roasPrev7 * 0.85 }
+    var isBleeder: Bool { spend7 > 0 && roas7 < 1.2 && (roasPrev7 < 1.5 || roasPrev7 == 0) }
+    var isFatigued: Bool { frequency >= 3.5 || (ctrPrev7 > 0 && ctr7 < ctrPrev7 * 0.7 && spend7 > 0) }
+    var isDying: Bool {       // early decay: CTR sliding before CPA spikes
+        ctrSlope < -4 && spend7 > 0 && !isBleeder
+    }
+}
+
+struct AnalystBrief: Codable {
+    var date: String          // yyyy-MM-dd
+    var text: String
+    var accountId: String = ""   // briefs are per-account
+}
+
 // Snapshot a backend hands the app.
 struct AccountSnapshot {
     var account: AdsAccount

@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
     case performance = "Performance"
+    case analyst = "Analyst"
     case campaigns = "Campaigns"
     case catalog = "Catalog"
     case diagnostics = "Diagnostics"
@@ -11,6 +12,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .performance: return "chart.bar.xaxis"
+        case .analyst: return "sparkles"
         case .campaigns: return "square.grid.2x2"
         case .catalog: return "shippingbox"
         case .diagnostics: return "stethoscope"

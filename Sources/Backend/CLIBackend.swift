@@ -191,6 +191,61 @@ struct CLIBackend: AdsBackend {
             pixels: pixels, breakdowns: breakdowns)
     }
 
+    // ── Analyst: per-ad 14d daily performance ──────────────────────────────
+
+    func adPerformance() async throws -> [AdPerf] {
+        let adRows = rows(try await json(["ads", "ad", "list", "--limit", "100"]))
+        guard !adRows.isEmpty else { return [] }
+        let adsetRows = (try? await json(["ads", "adset", "list", "--limit", "500"])).map(rows) ?? []
+        let campaignRows = (try? await json(["ads", "campaign", "list", "--limit", "200"])).map(rows) ?? []
+        let adsetCampaign = Dictionary(uniqueKeysWithValues: adsetRows.map { (str($0["id"]), str($0["campaign_id"])) })
+        let campaignNames = Dictionary(uniqueKeysWithValues: campaignRows.map { (str($0["id"]), str($0["name"])) })
+
+        var out: [AdPerf] = []
+        // One insights call per ad — capped to stay well inside rate limits.
+        for row in adRows.prefix(Self.insightsCap) {
+            let adId = str(row["id"])
+            let adsetId = str(row["adset_id"])
+            let daily = ((try? await json(["ads", "insights", "get", "--ad-id", adId,
+                                           "--date-preset", "last_14d", "--time-increment", "daily",
+                                           "--fields", "spend,impressions,clicks,ctr,frequency,actions,action_values"]))
+                .map(rows)) ?? []
+            let spends = daily.map { num($0["spend"]) }
+            let ctrs = daily.map { num($0["ctr"]) }
+            let revenues = daily.map { revenue(from: $0) }
+            let purchases = daily.map { Double(actionCount(from: $0, type: "purchase")) }
+            let freqs = daily.map { num($0["frequency"]) }.filter { $0 > 0 }
+
+            func window<T: Collection>(_ a: T, last: Bool) -> [Double] where T.Element == Double {
+                let arr = Array(a)
+                return last ? Array(arr.suffix(7)) : Array(arr.dropLast(7).suffix(7))
+            }
+            let s7 = window(spends, last: true).reduce(0, +)
+            let sP = window(spends, last: false).reduce(0, +)
+            let r7 = window(revenues, last: true).reduce(0, +)
+            let rP = window(revenues, last: false).reduce(0, +)
+            let p7 = window(purchases, last: true).reduce(0, +)
+            let pP = window(purchases, last: false).reduce(0, +)
+            let c7 = window(ctrs, last: true)
+            let cP = window(ctrs, last: false)
+
+            let campaignId = adsetCampaign[adsetId] ?? ""
+            out.append(AdPerf(
+                adId: adId, name: str(row["name"]),
+                campaignId: campaignId,
+                campaignName: campaignNames[campaignId] ?? "—",
+                adsetId: adsetId, status: status(row),
+                spend7: s7, spendPrev7: sP,
+                roas7: s7 > 0 ? r7 / s7 : 0, roasPrev7: sP > 0 ? rP / sP : 0,
+                cpa7: p7 > 0 ? s7 / p7 : 0, cpaPrev7: pP > 0 ? sP / pP : 0,
+                ctr7: c7.isEmpty ? 0 : c7.reduce(0, +) / Double(c7.count),
+                ctrPrev7: cP.isEmpty ? 0 : cP.reduce(0, +) / Double(cP.count),
+                frequency: freqs.isEmpty ? 0 : freqs.reduce(0, +) / Double(freqs.count),
+                dailyCtr: ctrs, dailySpend: spends))
+        }
+        return out
+    }
+
     // ── Creative previews ──────────────────────────────────────────────────
 
     struct CreativePreview {

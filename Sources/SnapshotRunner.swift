@@ -14,6 +14,7 @@ enum SnapshotRunner {
         liveCheckIfRequested()
         testCreateIfRequested()
         testAIIfRequested()
+        testAnalystIfRequested()
         guard let idx = CommandLine.arguments.firstIndex(of: "--snapshot") else { return }
         isActive = true
         let dir = CommandLine.arguments.count > idx + 1 ? CommandLine.arguments[idx + 1] : "/tmp/pacer_shots"
@@ -112,6 +113,41 @@ enum SnapshotRunner {
             print("connect failed: \(error.localizedDescription)")
             exit(1)
         }
+    }
+
+    // `MadMac --test-analyst` — exercises the Analyst end to end on sample
+    // data: signal math, AI daily brief + recommendations, copy-from-winners.
+    private static func testAnalystIfRequested() {
+        guard CommandLine.arguments.contains("--test-analyst") else { return }
+        Task {
+            do {
+                let perf = try await SampleBackend().adPerformance()
+                let winners = perf.filter(\.isWinner)
+                let bleeders = perf.filter(\.isBleeder)
+                let fatigued = perf.filter(\.isFatigued)
+                let dying = perf.filter(\.isDying)
+                print("signals: \(perf.count) ads → winners=\(winners.map(\.name)) bleeders=\(bleeders.map(\.name)) fatigued=\(fatigued.map(\.name)) dying=\(dying.map(\.name))")
+                guard !winners.isEmpty, !bleeders.isEmpty else { print("FAIL: signal math found no winners/bleeders in sample data"); exit(1) }
+
+                let result = try await Analyst.run(perf: perf, snapshot: SampleData.snapshot)
+                print("brief (\(result.brief.count) chars): \(result.brief.prefix(220))…")
+                print("recommendations: \(result.recommendations.count)")
+                for rec in result.recommendations {
+                    print("  - [\(rec.severity)] \(rec.title) → \(rec.actionType) \(rec.entityKind) \(rec.entityId) \(rec.actionType == "set_budget" ? "to \(Int(rec.value))" : "")")
+                }
+                guard !result.brief.isEmpty else { print("FAIL: empty brief"); exit(1) }
+
+                let copy = try await Analyst.copyFromWinners(winners, objective: "Sales")
+                print("winner copy: \(copy.headlines.count) headlines · e.g. \u{201C}\(copy.headlines.first ?? "")\u{201D}")
+                print("saved brief is today: \(Analyst.savedBriefIsToday(accountId: SampleData.account.accountId))")
+                print("PASS (analyst)")
+                exit(0)
+            } catch {
+                print("FAIL: \(error.localizedDescription)")
+                exit(1)
+            }
+        }
+        RunLoop.main.run()
     }
 
     // `MadMac --connect-openai <key>` — store the OpenAI key in the Keychain.

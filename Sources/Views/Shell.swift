@@ -5,6 +5,7 @@ import SwiftUI
 struct SidebarView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.theme) private var th
+    @ObservedObject private var ai = AIPrefs.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,7 +36,7 @@ struct SidebarView: View {
             .padding(.bottom, 14)
 
             VStack(spacing: 2) {
-                ForEach(AppSection.allCases) { section in
+                ForEach(AppSection.allCases.filter { $0 != .analyst || ai.isActive }) { section in
                     NavItem(section: section)
                 }
             }
