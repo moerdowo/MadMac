@@ -5,6 +5,10 @@ import SwiftUI
 struct DiagnosticsView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.theme) private var th
+    @ObservedObject private var ai = AIPrefs.shared
+    @State private var insights: [InsightRecommendation] = []
+    @State private var analyzing = false
+    @State private var analyzeError: String?
 
     var body: some View {
         let diags = state.snapshot.diagnostics
@@ -13,7 +17,46 @@ struct DiagnosticsView: View {
         let score = max(0, 100 - issues * 18 - learning * 6)
 
         VStack(alignment: .leading, spacing: 18) {
-            sectionHeader("Diagnostics", "Account health, learning phase, and delivery signals")
+            HStack(alignment: .bottom) {
+                sectionHeader("Diagnostics", "Account health, learning phase, and delivery signals")
+                Spacer()
+                if ai.isActive {
+                    Btn(variant: .soft, icon: "sparkles",
+                        label: analyzing ? "Analyzing…" : "Analyze account",
+                        disabled: analyzing) {
+                        analyzing = true
+                        analyzeError = nil
+                        Task {
+                            do { insights = try await AIService.analyze(state.snapshot) }
+                            catch { analyzeError = error.localizedDescription }
+                            analyzing = false
+                        }
+                    }
+                }
+            }
+            if let analyzeError {
+                Text(analyzeError).font(jakarta(12, .medium)).foregroundStyle(th.danger)
+            }
+            if !insights.isEmpty {
+                Card(pad: 0) {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 7) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(th.accent)
+                            Text("AI insights").font(jakarta(15, .bold)).foregroundStyle(th.fg1)
+                            Spacer()
+                            Text("recommendations stage changes — nothing applies without review")
+                                .font(jakarta(11)).foregroundStyle(th.fg4)
+                        }
+                        .padding(.init(top: 16, leading: 20, bottom: 16, trailing: 20))
+                        .overlay(alignment: .bottom) { Rectangle().fill(th.border).frame(height: 1) }
+                        ForEach(insights) { insight in
+                            InsightRow(insight: insight)
+                        }
+                    }
+                }
+            }
 
             HStack(spacing: 14) {
                 Card {
@@ -57,6 +100,84 @@ struct DiagnosticsView: View {
                 Text(value).font(jakarta(24, .extra)).foregroundStyle(th.fg1)
                 Text(label).font(jakarta(12.5)).foregroundStyle(th.fg3)
             }
+        }
+    }
+}
+
+// AI insight with an optional stageable action (flows into the review sheet).
+private struct InsightRow: View {
+    var insight: InsightRecommendation
+    @EnvironmentObject private var state: AppState
+    @Environment(\.theme) private var th
+
+    var body: some View {
+        let (fg, bg): (Color, Color) = {
+            switch insight.severity {
+            case "danger": return (th.danger, th.danger100)
+            case "warning": return (th.warning, th.warning100)
+            default: return (th.brandBlue, th.brandBlue100)
+            }
+        }()
+        HStack(alignment: .top, spacing: 14) {
+            RoundedRectangle(cornerRadius: 9)
+                .fill(bg)
+                .frame(width: 38, height: 38)
+                .overlay(Image(systemName: "lightbulb")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(fg))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(insight.title).font(jakarta(14.5, .bold)).foregroundStyle(th.fg1)
+                Text(insight.detail)
+                    .font(jakarta(13)).foregroundStyle(th.fg3)
+                    .lineSpacing(3)
+            }
+            Spacer()
+            if let label = actionLabel {
+                Btn(variant: .soft, size: .sm, label: staged ? "Staged ✓" : label,
+                    disabled: staged) {
+                    stage()
+                }
+            }
+        }
+        .padding(.init(top: 16, leading: 20, bottom: 16, trailing: 20))
+        .overlay(alignment: .bottom) { Rectangle().fill(th.border).frame(height: 1) }
+    }
+
+    private var entity: (EntityKind, String, EntityStatus, Double)? {
+        for c in state.campaigns {
+            if c.id == insight.entityId { return (.campaign, c.name, c.status, c.daily) }
+            for a in c.adsets {
+                if a.id == insight.entityId { return (.adset, a.name, a.status, a.daily) }
+                for ad in a.ads where ad.id == insight.entityId { return (.ad, ad.name, ad.status, 0) }
+            }
+        }
+        return nil
+    }
+
+    private var actionLabel: String? {
+        guard entity != nil else { return nil }
+        switch insight.actionType {
+        case "pause": return "Stage pause"
+        case "activate": return "Stage activate"
+        case "set_budget": return "Stage \(Fmt.money(insight.value, compact: true))/d"
+        default: return nil
+        }
+    }
+
+    private var staged: Bool {
+        state.pending[insight.entityId] != nil || state.pendingBudgets[insight.entityId] != nil
+    }
+
+    private func stage() {
+        guard let (kind, name, base, daily) = entity else { return }
+        switch insight.actionType {
+        case "pause":
+            state.toggle(entityId: insight.entityId, kind: kind, name: name, base: base, to: .paused)
+        case "activate":
+            state.toggle(entityId: insight.entityId, kind: kind, name: name, base: base, to: .active)
+        case "set_budget":
+            state.stageBudget(entityId: insight.entityId, current: daily, to: insight.value)
+        default: break
         }
     }
 }

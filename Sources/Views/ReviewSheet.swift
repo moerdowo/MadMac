@@ -7,6 +7,8 @@ struct ReviewSheet: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.theme) private var th
     @State private var launchLive = false
+    @State private var policyReport: PolicyReport?
+    @State private var policyChecking = false
 
     var body: some View {
         let plan = state.buildPlan(launchLive: launchLive)
@@ -43,6 +45,7 @@ struct ReviewSheet: View {
                 let body = VStack(alignment: .leading, spacing: 16) {
                     if let draft = state.draft {
                         createSpec(draft)
+                        policySection(draft)
                     }
                     if !plan.statusChanges.isEmpty {
                         statusSection(plan.statusChanges)
@@ -176,6 +179,75 @@ struct ReviewSheet: View {
             .background(th.bg1)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(th.border, lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    // ── Policy pre-check (AI, advisory only) ───────────────────────────────
+
+    @ViewBuilder private func policySection(_ draft: DraftCampaign) -> some View {
+        let hasCopy = !(draft.headlines.first ?? "").isEmpty || !(draft.texts.first ?? "").isEmpty
+        if AIPrefs.shared.isActive && hasCopy {
+            VStack(alignment: .leading, spacing: 8) {
+                if policyChecking {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.mini)
+                        Text("Checking copy against Meta ad policies…")
+                            .font(jakarta(12)).foregroundStyle(th.fg3)
+                    }
+                } else if let report = policyReport {
+                    if report.flags.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.shield")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(th.success)
+                            Text("Policy check passed — no rejection risks found in the copy.")
+                                .font(jakarta(12.5)).foregroundStyle(th.fg2)
+                        }
+                    } else {
+                        sectionLabel("Policy risks (\(report.risk))")
+                        ForEach(report.flags) { flag in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "exclamationmark.bubble")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(report.risk == "high" ? th.danger : th.warning)
+                                        .padding(.top, 1)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("\u{201C}\(flag.text)\u{201D} — \(flag.reason)")
+                                            .font(jakarta(12.5, .semibold)).foregroundStyle(th.fg1)
+                                        (Text("Try: ").font(jakarta(12)).foregroundStyle(th.fg3)
+                                         + Text(flag.suggestion).font(jakarta(12)).italic().foregroundStyle(th.fg2))
+                                    }
+                                }
+                            }
+                            .padding(.init(top: 10, leading: 12, bottom: 10, trailing: 12))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(report.risk == "high" ? th.danger100 : th.warning100)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                } else if !AIPrefs.shared.autoPolicyCheck {
+                    Btn(variant: .ghost, size: .sm, icon: "checkmark.shield", label: "Check policy risks") {
+                        runPolicyCheck(draft)
+                    }
+                }
+            }
+            .task(id: draft.headline + draft.text) {
+                if AIPrefs.shared.autoPolicyCheck && policyReport == nil && !policyChecking {
+                    runPolicyCheck(draft)
+                }
+            }
+        }
+    }
+
+    private func runPolicyCheck(_ draft: DraftCampaign) {
+        policyChecking = true
+        Task {
+            policyReport = try? await AIService.policyCheck(
+                headline: draft.headlines.first ?? "",
+                text: draft.texts.first ?? "",
+                objective: draft.objective.rawValue)
+            policyChecking = false
         }
     }
 

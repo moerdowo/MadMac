@@ -10,8 +10,10 @@ enum SnapshotRunner {
 
     static func runIfRequested() {
         connectIfRequested()
+        connectOpenAIIfRequested()
         liveCheckIfRequested()
         testCreateIfRequested()
+        testAIIfRequested()
         guard let idx = CommandLine.arguments.firstIndex(of: "--snapshot") else { return }
         isActive = true
         let dir = CommandLine.arguments.count > idx + 1 ? CommandLine.arguments[idx + 1] : "/tmp/pacer_shots"
@@ -110,6 +112,87 @@ enum SnapshotRunner {
             print("connect failed: \(error.localizedDescription)")
             exit(1)
         }
+    }
+
+    // `MadMac --connect-openai <key>` — store the OpenAI key in the Keychain.
+    private static func connectOpenAIIfRequested() {
+        guard let idx = CommandLine.arguments.firstIndex(of: "--connect-openai"),
+              CommandLine.arguments.count > idx + 1 else { return }
+        do {
+            try AIPrefs.saveKey(CommandLine.arguments[idx + 1])
+            UserDefaults.standard.set(true, forKey: "aiEnabled")
+            print("openai key stored, AI enabled")
+            exit(0)
+        } catch {
+            print("failed: \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+
+    // `MadMac --test-ai <image>` — exercises every AI feature with real API
+    // calls: connection, copywriter, brief parse, policy check, image
+    // generation (1 low-quality), image edit, and account analysis.
+    private static func testAIIfRequested() {
+        guard let idx = CommandLine.arguments.firstIndex(of: "--test-ai"),
+              CommandLine.arguments.count > idx + 1 else { return }
+        let imagePath = CommandLine.arguments[idx + 1]
+        UserDefaults.standard.set("low", forKey: "_ignored")  // keep image cost minimal below
+        Task {
+            var failures = 0
+            func check(_ name: String, _ run: () async throws -> String) async {
+                do { print("✓ \(name): \(try await run())") }
+                catch { print("✗ \(name): \(error.localizedDescription)"); failures += 1 }
+            }
+
+            await check("connection") {
+                "\(try await OpenAIClient().listModels().count) models"
+            }
+            await check("copywriter") {
+                let set = try await AIService.generateCopy(
+                    product: "Mayar — platform pembayaran online untuk UMKM Indonesia, terima pembayaran lewat link",
+                    tone: "Casual", language: "Indonesian", objective: "Sales")
+                return "\(set.headlines.count) headlines, \(set.texts.count) texts · e.g. \u{201C}\(set.headlines.first ?? "")\u{201D}"
+            }
+            await check("brief parse") {
+                let d = try await AIService.parseBrief(
+                    "jualan produk pembayaran digital Mayar, budget 250rb per hari, target seluruh indonesia, optimize purchase, link ke mayar.id",
+                    currency: "IDR",
+                    pixels: [PixelInfo(id: "1032483741271279", name: "ADASSD", lastFired: "2026-06-05")],
+                    pages: [PageInfo(id: "110149734238796", name: "Mayar", category: "Internet company")])
+                return "name=\(d.name) daily=\(Int(d.daily)) bid=\(Int(d.bidAmount)) opt=\(d.optimization.rawValue) pixel=\(d.pixelId) link=\(d.linkURL)"
+            }
+            await check("policy check (risky copy)") {
+                let report = try await AIService.policyCheck(
+                    headline: "Kulit putih dalam 3 hari, dijamin!",
+                    text: "Punya jerawat membandel? Krim ini menghilangkan jerawat kamu selamanya, hasil terlihat sebelum dan sesudah!",
+                    objective: "Sales")
+                return "risk=\(report.risk), \(report.flags.count) flags"
+            }
+            let savedQuality = UserDefaults.standard.string(forKey: "aiImageQuality")
+            UserDefaults.standard.set(ImageQuality.low.rawValue, forKey: "aiImageQuality")
+            var generated: URL?
+            await check("image generation (1× low)") {
+                let urls = try await AIService.generateImages(
+                    prompt: "Minimalist product ad photo: smartphone showing a payment success screen, pastel background, soft studio light",
+                    size: "1024x1024", count: 1)
+                generated = urls.first
+                return urls.map(\.lastPathComponent).joined(separator: ", ")
+            }
+            await check("image edit") {
+                let source = generated ?? URL(fileURLWithPath: imagePath)
+                let url = try await AIService.editImage(source, instruction: "make the background a warm sunset gradient")
+                return url.lastPathComponent
+            }
+            UserDefaults.standard.set(savedQuality, forKey: "aiImageQuality")
+            await check("account analysis (sample data)") {
+                let insights = try await AIService.analyze(SampleData.snapshot)
+                let actionable = insights.filter { $0.actionType != "none" }.count
+                return "\(insights.count) insights (\(actionable) actionable) · e.g. \u{201C}\(insights.first?.title ?? "")\u{201D}"
+            }
+            print(failures == 0 ? "PASS (all AI features)" : "FAIL (\(failures) failures)")
+            exit(failures == 0 ? 0 : 1)
+        }
+        RunLoop.main.run()
     }
 
     // `MadMac --test-create <image>` — end-to-end test of the apply pipeline

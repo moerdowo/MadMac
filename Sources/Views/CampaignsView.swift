@@ -8,6 +8,8 @@ struct CampaignsListView: View {
     @Environment(\.theme) private var th
     @State private var query = ""
     @State private var filter = "all"
+    @State private var briefOpen = false
+    @ObservedObject private var ai = AIPrefs.shared
 
     var body: some View {
         let rows = state.campaigns.filter { c in
@@ -27,9 +29,19 @@ struct CampaignsListView: View {
                         .font(jakarta(13.5)).foregroundStyle(th.fg3)
                 }
                 Spacer()
+                if ai.isActive {
+                    Btn(variant: .soft, icon: "sparkles", label: "New from brief…") {
+                        briefOpen = true
+                    }
+                }
                 Btn(variant: .primary, icon: "plus", label: "New campaign") {
                     state.createOpen = true
                 }
+            }
+            .sheet(isPresented: $briefOpen) {
+                BriefSheet { briefOpen = false }
+                    .environmentObject(state)
+                    .environment(\.theme, th)
             }
 
             HStack(spacing: 12) {

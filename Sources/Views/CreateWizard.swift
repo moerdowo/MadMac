@@ -12,6 +12,8 @@ struct CreateWizard: View {
     @State private var draft = DraftCampaign()
     @State private var pages: [PageInfo] = []
     @State private var importerOpen = false
+    @State private var aiSheet: AISheetMode?
+    @ObservedObject private var ai = AIPrefs.shared
 
     private let steps = ["Objective", "Budget & audience", "Creative"]
 
@@ -96,6 +98,19 @@ struct CreateWizard: View {
             if case .success(let urls) = result {
                 draft.media.append(contentsOf: urls)
             }
+        }
+        .sheet(item: $aiSheet) { mode in
+            Group {
+                switch mode {
+                case .copy:
+                    CopyGenSheet(draft: $draft) { aiSheet = nil }
+                case .imageGen:
+                    ImageGenSheet(draft: $draft) { aiSheet = nil }
+                case .imageEdit(let url):
+                    ImageEditSheet(source: url, draft: $draft) { aiSheet = nil }
+                }
+            }
+            .environment(\.theme, th)
         }
     }
 
@@ -254,10 +269,29 @@ struct CreateWizard: View {
             }
 
             field("Media", hint: "images or videos · 2+ enables dynamic creative") {
-                MediaDropZone(media: $draft.media) { importerOpen = true }
+                VStack(alignment: .leading, spacing: 8) {
+                    MediaDropZone(media: $draft.media,
+                                  onEdit: ai.isActive ? { url in aiSheet = .imageEdit(url) } : nil) {
+                        importerOpen = true
+                    }
+                    if ai.isActive {
+                        Btn(variant: .soft, size: .sm, icon: "sparkles", label: "Generate image…") {
+                            aiSheet = .imageGen
+                        }
+                    }
+                }
             }
 
-            field("Headline") { WizardTextField(text: $draft.headline) }
+            field("Headline") {
+                HStack(spacing: 8) {
+                    WizardTextField(text: $draft.headline)
+                    if ai.isActive {
+                        Btn(variant: .soft, size: .sm, icon: "sparkles", label: "Generate copy…") {
+                            aiSheet = .copy
+                        }
+                    }
+                }
+            }
             field("Primary text") {
                 TextEditor(text: $draft.text)
                     .font(jakarta(14))
@@ -341,11 +375,13 @@ struct CreateWizard: View {
 
 struct MediaDropZone: View {
     @Binding var media: [URL]
+    var onEdit: ((URL) -> Void)?
     var browse: () -> Void
     @Environment(\.theme) private var th
     @State private var hovering = false
 
     private let videoExts = ["mp4", "mov", "avi", "mkv", "wmv"]
+    private let imageExts = ["jpg", "jpeg", "png", "gif", "bmp", "webp"]
 
     var body: some View {
         VStack(spacing: 10) {
@@ -373,6 +409,18 @@ struct MediaDropZone: View {
                                 .foregroundStyle(th.fg1)
                                 .lineLimit(1)
                             Spacer()
+                            if let onEdit, imageExts.contains(url.pathExtension.lowercased()) {
+                                Button {
+                                    onEdit(url)
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "sparkles").font(.system(size: 10, weight: .semibold))
+                                        Text("Edit").font(jakarta(11, .semibold))
+                                    }
+                                    .foregroundStyle(th.accent)
+                                }
+                                .buttonStyle(.plain)
+                            }
                             Button {
                                 media.remove(at: i)
                             } label: {

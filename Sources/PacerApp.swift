@@ -14,6 +14,7 @@ struct PacerApp: App {
 
     init() {
         SnapshotRunner.runIfRequested()
+        AIService.cleanupGenerated()
     }
 
     var body: some Scene {

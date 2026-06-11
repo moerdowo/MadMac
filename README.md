@@ -30,6 +30,7 @@ Flipping any status switch or finishing the create wizard **stages** the change.
 - **Campaigns** — an expandable campaign → ad set → ad tree with per-row metrics, staged budget edits, duplicate, archive, and safe-delete (all gated behind the review sheet), search and status filters, and a detail drawer.
 - **Menu-bar pacing** — today's spend vs. budget, blended ROAS, and staged-change count, always one click away.
 - **Multi-account** — switch between every ad account your token can reach from the sidebar account card.
+- **AI Creative Studio (optional, off by default)** — bring your own OpenAI API key (Settings → AI, stored in Keychain) to unlock: ad-copy generation (5 headlines × 5 texts, Indonesian/English, auto-fills dynamic creative), **image generation and editing** (gpt-image-1 — aspect presets for feed/Reels, "remove the text overlay"-style edits), natural-language **brief → prefilled campaign**, automatic **policy pre-checks** on your copy in the review sheet, and account **analysis with stageable recommendations**. AI only ever drafts and stages — applying anything still requires Approve. See [docs/ai-spec.md](docs/ai-spec.md).
 
   ![Campaigns](docs/04-campaigns.png)
 

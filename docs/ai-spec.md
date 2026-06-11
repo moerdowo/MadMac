@@ -1,6 +1,6 @@
 # MadMac AI Features — Specification (for review)
 
-Status: **draft, awaiting approval — no code yet**
+Status: **implemented & tested 2026-06-11** (all phases; 3b chat deferred as specified)
 Provider: **OpenAI API** (chosen for image generation + editing)
 
 ## Principles
