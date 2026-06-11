@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // Campaign management — the expandable campaign → ad set → ad tree with
 // staged status switches (campaigns.jsx).
@@ -297,16 +298,37 @@ private struct AdRow: View {
     var ad: Ad
     @EnvironmentObject private var state: AppState
     @Environment(\.theme) private var th
+    @State private var previewOpen = false
 
     var body: some View {
         HStack(spacing: 10) {
             StatusSwitch(entityId: ad.id, kind: .ad, name: ad.name, base: ad.status)
-            RoundedRectangle(cornerRadius: 7)
-                .fill(ad.thumb)
+            Button {
+                if ad.thumbURL != nil || ad.imageURL != nil { previewOpen = true }
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7).fill(ad.thumb)
+                    if let url = ad.thumbURL ?? ad.imageURL {
+                        AsyncImage(url: url) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Image(systemName: ad.format.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    } else {
+                        Image(systemName: ad.format.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
                 .frame(width: 30, height: 30)
-                .overlay(Image(systemName: ad.format.icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $previewOpen) {
+                AdPreviewPopover(ad: ad).environment(\.theme, th)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(ad.name)
                     .font(jakarta(13, .medium))
@@ -328,5 +350,53 @@ private struct AdRow: View {
         .background(th.bg2)
         .overlay(alignment: .top) { Rectangle().fill(th.border).frame(height: 1) }
         .hoverRow()
+    }
+}
+
+// Click an ad's thumbnail → larger creative preview with open-in-browser.
+private struct AdPreviewPopover: View {
+    var ad: Ad
+    @Environment(\.theme) private var th
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if let url = ad.imageURL ?? ad.thumbURL {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    ProgressView().frame(width: 280, height: 200)
+                }
+                .frame(maxWidth: 320, maxHeight: 320)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .bottomLeading) {
+                    if ad.format == .video {
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill").font(.system(size: 9, weight: .bold))
+                            Text("Video — thumbnail shown").font(jakarta(10.5, .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(.black.opacity(0.55)))
+                        .padding(8)
+                    }
+                }
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(ad.name).font(jakarta(12.5, .bold)).foregroundStyle(th.fg1).lineLimit(1)
+                    Text(ad.format.rawValue).font(jakarta(10.5)).foregroundStyle(th.fg4)
+                }
+                Spacer()
+                if let preview = ad.previewURL {
+                    Btn(variant: .soft, size: .sm, icon: "arrow.up.right", label: "Open ad preview") {
+                        NSWorkspace.shared.open(preview)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 344)
+        .background(th.bg1)
     }
 }

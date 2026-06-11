@@ -138,6 +138,9 @@ struct Ad: Identifiable {
     var ctr: Double
     var format: AdFormat
     var thumb: Color
+    var thumbURL: URL?        // creative thumbnail (small)
+    var imageURL: URL?        // full-size creative image, when available
+    var previewURL: URL?      // Meta's shareable ad preview link
 }
 
 struct AdSet: Identifiable {

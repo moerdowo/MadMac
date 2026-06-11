@@ -123,11 +123,18 @@ struct CLIBackend: AdsBackend {
 
         let thumbs: [Color] = [Color(hex: 0xE91E78), Color(hex: 0x2D3DEC), Color(hex: 0x1FB36B),
                                Color(hex: 0xF4A52A), Color(hex: 0x7A5AE0)]
+        // Creative previews: the CLI's fixed output may not carry URLs, so a
+        // single batched (read-only) Graph API call fills the gaps.
+        let creativeInfo = await creativePreviews(adRows: adRows)
         var adsByAdset: [String: [Ad]] = [:]
         for (i, row) in adRows.enumerated() {
-            let ad = Ad(id: str(row["id"]), name: str(row["name"]), status: status(row),
-                        spend: 0, revenue: 0, roas: 0, ctr: 0, format: .image,
-                        thumb: thumbs[i % thumbs.count])
+            let id = str(row["id"])
+            let info = creativeInfo[id]
+            let format: AdFormat = info?.isVideo == true ? .video : .image
+            let ad = Ad(id: id, name: str(row["name"]), status: status(row),
+                        spend: 0, revenue: 0, roas: 0, ctr: 0, format: format,
+                        thumb: thumbs[i % thumbs.count],
+                        thumbURL: info?.thumb, imageURL: info?.image, previewURL: info?.preview)
             adsByAdset[str(row["adset_id"]), default: []].append(ad)
         }
         var adsetsByCampaign: [String: [AdSet]] = [:]
@@ -182,6 +189,62 @@ struct CLIBackend: AdsBackend {
             seriesSpend: seriesSpend, seriesRevenue: seriesRevenue, seriesRoas: seriesRoas,
             products: [], events: [],
             pixels: pixels, breakdowns: breakdowns)
+    }
+
+    // ── Creative previews ──────────────────────────────────────────────────
+
+    struct CreativePreview {
+        var thumb: URL?
+        var image: URL?
+        var preview: URL?
+        var isVideo: Bool
+    }
+
+    /// Thumbnail/image/preview URLs per ad id. Tries any URLs the CLI rows
+    /// already carry, then fills the rest with one batched Graph API read
+    /// (same token, read-only): /?ids=…&fields=preview_shareable_link,
+    /// creative{thumbnail_url,image_url,video_id}.
+    private func creativePreviews(adRows: [[String: Any]]) async -> [String: CreativePreview] {
+        var out: [String: CreativePreview] = [:]
+        var missing: [String] = []
+        for row in adRows {
+            let id = str(row["id"])
+            guard !id.isEmpty else { continue }
+            let creative = row["creative"] as? [String: Any] ?? [:]
+            let thumb = URL(string: str(creative["thumbnail_url"]))
+            let image = URL(string: str(creative["image_url"]))
+            if thumb != nil || image != nil {
+                out[id] = CreativePreview(thumb: thumb, image: image,
+                                          preview: URL(string: str(row["preview_shareable_link"])),
+                                          isVideo: !str(creative["video_id"]).isEmpty)
+            } else {
+                missing.append(id)
+            }
+        }
+        guard !missing.isEmpty, !credentials.accessToken.isEmpty else { return out }
+        let token = credentials.accessToken
+        // Graph batches up to 50 ids per request.
+        for chunk in stride(from: 0, to: missing.count, by: 50).map({ Array(missing[$0..<min($0 + 50, missing.count)]) }) {
+            var comps = URLComponents(string: "https://graph.facebook.com/v21.0/")!
+            comps.queryItems = [
+                URLQueryItem(name: "ids", value: chunk.joined(separator: ",")),
+                URLQueryItem(name: "fields", value: "preview_shareable_link,creative{thumbnail_url,image_url,video_id}"),
+                URLQueryItem(name: "access_token", value: token),
+            ]
+            guard let url = comps.url,
+                  let (data, _) = try? await URLSession.shared.data(from: url),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            for (adId, value) in obj {
+                guard let row = value as? [String: Any] else { continue }
+                let creative = row["creative"] as? [String: Any] ?? [:]
+                out[adId] = CreativePreview(
+                    thumb: URL(string: str(creative["thumbnail_url"])),
+                    image: URL(string: str(creative["image_url"])),
+                    preview: URL(string: str(row["preview_shareable_link"])),
+                    isVideo: !str(creative["video_id"]).isEmpty)
+            }
+        }
+        return out
     }
 
     private func breakdown(_ dimension: String) async -> [BreakdownSlice] {
