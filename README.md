@@ -26,11 +26,16 @@ Flipping any status switch or finishing the create wizard **stages** the change.
 ## Features
 
 - **Performance dashboard** — KPI cards with 7-day deltas and sparklines (spend, revenue, ROAS, purchases, CPA, CTR, reach, CPM), a revenue/spend chart with real 7/30/90-day ranges, spend-by-placement donut, audience demographics (age, gender, geo), top campaigns, and a diagnostics feed. Three switchable layouts: Overview, Spotlight, Table.
-- **Full campaign creation** — the 3-step wizard builds the whole chain: campaign (budget) → ad set (optimization goal, bid cap, countries, pixel + conversion event, optional schedule) → creative (drag-and-drop image/video upload, headline, primary text, link, CTA, Facebook Page picker) → ad. Multiple assets or copy variants become a dynamic-creative (DCO) ad automatically.
+- **Full campaign creation** — the 3-step wizard builds the whole chain: campaign (budget) → ad set (optimization goal, bid cap, countries, pixel + conversion event, optional schedule) → creative (drag-and-drop image/video upload, headline, primary text, link, CTA, Facebook Page picker) → ad. Multiple assets or copy variants become a dynamic-creative (DCO) ad automatically. Ads show their real creative thumbnails in the tree — click for a full preview.
+
+  ![Create wizard](docs/06-create-wizard.png)
 - **Campaigns** — an expandable campaign → ad set → ad tree with per-row metrics, staged budget edits, duplicate, archive, and safe-delete (all gated behind the review sheet), search and status filters, and a detail drawer.
 - **Menu-bar pacing** — today's spend vs. budget, blended ROAS, and staged-change count, always one click away.
 - **Multi-account** — switch between every ad account your token can reach from the sidebar account card.
-- **AI Creative Studio (optional, off by default)** — bring your own OpenAI API key (Settings → AI, stored in Keychain) to unlock: ad-copy generation (5 headlines × 5 texts, Indonesian/English, auto-fills dynamic creative), **image generation and editing** (gpt-image-1 — aspect presets for feed/Reels, "remove the text overlay"-style edits), natural-language **brief → prefilled campaign**, automatic **policy pre-checks** on your copy in the review sheet, and account **analysis with stageable recommendations**. AI only ever drafts and stages — applying anything still requires Approve. See [docs/ai-spec.md](docs/ai-spec.md).
+- **AI Creative Studio (optional, off by default)** — bring your own OpenAI API key (Settings → AI, stored in Keychain) to unlock: ad-copy generation (5 headlines × 5 texts, Indonesian/English, auto-fills dynamic creative), **image generation and editing** (gpt-image-1 — aspect presets for feed/Reels, "remove the text overlay"-style edits), natural-language **brief → prefilled campaign**, and automatic **policy pre-checks** on your copy in the review sheet. AI only ever drafts and stages — applying anything still requires Approve. See [docs/ai-spec.md](docs/ai-spec.md).
+- **AI Analyst** — a daily brief plus winners / bleeders / fatigue-watchlist boards. The signals (winner, bleeder, fatigued, *dying* — CTR decay caught before CPA spikes) are computed deterministically from per-ad insights; the AI writes the narrative, recommends pausing bleeders and shifting budget to winners (one click to stage, Approve still required), and can write **new ad copy from your winners**.
+
+  ![AI Analyst](docs/14-analyst.png)
 
   ![Campaigns](docs/04-campaigns.png)
 

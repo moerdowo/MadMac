@@ -14,6 +14,16 @@ struct AnalystView: View {
     @State private var error: String?
     @State private var copySheetOpen = false
 
+    // ImageRenderer can't run .task, so snapshots inject data statically.
+    static var snapshotData: ([AdPerf], AnalystResult)?
+
+    init() {
+        if let (perf, result) = Self.snapshotData {
+            _perf = State(initialValue: perf)
+            _result = State(initialValue: result)
+        }
+    }
+
     var body: some View {
         let winners = perf.filter(\.isWinner)
         let bleeders = perf.filter(\.isBleeder)
@@ -60,6 +70,7 @@ struct AnalystView: View {
                             .font(jakarta(14))
                             .foregroundStyle(th.fg1)
                             .lineSpacing(5)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         Text(loading ? "Reading the account…" : "No brief yet — Refresh analysis generates one. It updates automatically once a day.")
                             .font(jakarta(13)).foregroundStyle(th.fg3)

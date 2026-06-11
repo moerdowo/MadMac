@@ -88,6 +88,28 @@ enum SnapshotRunner {
         shot("08-diagnostics") { $0.section = .diagnostics }
         shot("09-catalog") { $0.section = .catalog }
         shot("10-datasets") { $0.section = .datasets }
+        AnalystView.snapshotData = (
+            SampleData.adPerf(),
+            AnalystResult(
+                brief: "Spend is pacing at Rp 4,8 jt of Rp 6 jt today across 3 active campaigns. Retargeting is your engine: \u{201C}Dynamic — Catalog retarget\u{201D} leads at 7,3× ROAS — shift budget toward it. \u{201C}UGC Pagi cerah 15s\u{201D} is fatiguing (frequency 4,8, CTR down 31%) — refresh the creative this week before CPA climbs. The quiz lead form is bleeding (ROAS 0,8, CPA up 36%): pause it. One move today: approve the budget shift below.",
+                recommendations: [
+                    InsightRecommendation(title: "Pause the bleeding lead form",
+                                          detail: "\u{201C}Lead form — Tipe kulitmu?\u{201D} is at 0,8× ROAS with CPA up 36% week over week. Pause and rebuild the offer.",
+                                          severity: "danger", actionType: "pause",
+                                          entityId: "ad_10", entityKind: "ad", value: 0),
+                    InsightRecommendation(title: "Shift budget to the retargeting winner",
+                                          detail: "Retargeting holds 6,6× blended ROAS. Raise its daily budget ~30% and let it scale.",
+                                          severity: "info", actionType: "set_budget",
+                                          entityId: "23847", entityKind: "campaign", value: 1_200_000),
+                    InsightRecommendation(title: "Refresh the fatigued hero UGC",
+                                          detail: "Frequency 4,8 and CTR sliding 3%/day. Brief a new hook with the same opening beat — or generate variants from winners.",
+                                          severity: "warning", actionType: "none",
+                                          entityId: "", entityKind: "none", value: 0),
+                ],
+                generatedAt: Date()))
+        shot("14-analyst") { $0.section = .analyst }
+        AnalystView.snapshotData = nil
+
         shot("11-dark-overview", dark: true) { $0.section = .performance }
         shot("12-dark-campaigns", dark: true) { $0.section = .campaigns }
         shot("13-connect", ) { state in

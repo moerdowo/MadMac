@@ -150,6 +150,44 @@ enum SampleData {
             countries: [BreakdownSlice(label: "ID", value: 33_500_000)])
     }
 
+    // Synthesized per-ad series so the Analyst is fully demonstrable in
+    // sample mode: clear winners, a bleeder, and a fatiguing hero ad.
+    static func adPerf() -> [AdPerf] {
+        var out: [AdPerf] = []
+        var index = 0
+        for campaign in campaigns {
+            for adset in campaign.adsets {
+                for ad in adset.ads {
+                    let roas7 = ad.roas
+                    let fatigueFactor: Double = ad.id == "ad_1" ? 0.55 : 1.0   // hero ad is fatiguing
+                    let bleed = campaign.objective == .leads                    // quiz campaign bleeds
+                    let baseCtr = ad.ctr
+                    let dailyCtr = (0..<14).map { day -> Double in
+                        let drift = fatigueFactor < 1 ? 1.0 - Double(day) * 0.035 : 1.0 + sin(Double(day)) * 0.04
+                        return max(baseCtr * drift, 0.2)
+                    }
+                    let spend7 = ad.spend * 0.25
+                    out.append(AdPerf(
+                        adId: ad.id, name: ad.name,
+                        campaignId: campaign.id, campaignName: campaign.name,
+                        adsetId: adset.id, status: ad.status,
+                        spend7: spend7, spendPrev7: ad.spend * 0.22,
+                        roas7: bleed ? 0.8 : roas7 * fatigueFactor,
+                        roasPrev7: bleed ? 1.1 : roas7,
+                        cpa7: bleed ? 95_000 : (roas7 > 0 ? spend7 / max(Double(adset.purchases) * 0.25, 1) : 0),
+                        cpaPrev7: bleed ? 70_000 : (roas7 > 0 ? spend7 / max(Double(adset.purchases) * 0.27, 1) : 0),
+                        ctr7: dailyCtr.suffix(7).reduce(0, +) / 7,
+                        ctrPrev7: dailyCtr.prefix(7).reduce(0, +) / 7,
+                        frequency: ad.id == "ad_1" ? 4.8 : 1.4 + Double(index % 5) * 0.3,
+                        dailyCtr: dailyCtr,
+                        dailySpend: (0..<14).map { _ in spend7 / 7 }))
+                    index += 1
+                }
+            }
+        }
+        return out
+    }
+
     static var snapshot: AccountSnapshot {
         AccountSnapshot(account: account, kpis: kpis, campaigns: campaigns,
                         diagnostics: diagnostics,
